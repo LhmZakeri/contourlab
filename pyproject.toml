@@ -1,0 +1,23 @@
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "contourlab"
+version = "0.1.0"
+description = "Toolkit for 2D contour plots and 3D stacked contour visualizations"
+readme = "README.md"
+license= {text = "MIT"}
+authors = [{name = "Elham Zakeri"}]
+requires-python = ">=3.9"
+dependencies = [
+"numpy>=1.24",
+"pandas>=2.0",
+"matplotlib>=3.7",
+"scipy>=1.10",
+]
+
+[project.scripts]
+contourlab = "contourlab.cli:main"
+
