@@ -109,19 +109,20 @@ def plot_contour(
             ax.clabel(contour_lines, inline=True, fontsize=8, fmt="%.2f")
 
     # --- Filled contours -----------------------------------------------------
-    contour_filled = None
-    colorbar = None
+    contour_filled, colorbar = None, None
 
     if highlight:
         contour_filled = highlight_region(
             ax, X, Y, Z, percent=percentile, levels=levels, cmap=cmap
         )
-    else:
-        if norm is None:
-            norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
-        contour_filled = ax.contourf(
-            X, Y, Z, levels=levels, cmap=cmap, norm=norm, extend="both"
-        )
+
+    if norm is None:
+        if vmin is None or vmax is None:
+            vmin, vmax = data_min, data_max
+        norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+    contour_filled = ax.contourf(
+        X, Y, Z, levels=levels, cmap=cmap, norm=norm, extend="both"
+    )
 
     # --- Colorbar ------------------------------------------------------------
     if add_colorbar and contour_filled is not None:
@@ -149,33 +150,36 @@ def plot_multiple_contours(
     norm: Optional[mpl.colors.Normalize] = None,
     vmin: Optional[float] = None,
     vmax: Optional[float] = None,
+    levels: Optional[int] = 10,
     figsize: tuple = (10, 6),
     **kwargs,
 ) -> Dict[str, object]:
     """
-    Plot multiple contour maps in agrid layout.
+    Plot multiple contour maps in a grid layout.
 
     Args:
-    dfs : list of pandas.DataFrame
-        List of dataframes containing x, y, z columns.
-    x_cols, y_cols, z_cols : str
-        column names of x-axis, y-axis, and z-axis.
-    ncols : int, default=2
-        Number of columns in subplot grid.
-    share_norm : bool, default=True
-        If True, all subplots share the same normalization(vmin/vmax or norm)
-    norm : matplotlib.colors.Normalize, optional
-        Custom normalization for all subplots (override vmin/vmax)
-    vmin, vmax : float, optional
-        Gloal normalization bounds (only used if norm=None)
-    figsize: tuple, default=(10, 6)
-        Size of the entire figure.
-    **kwargs :
-        Additional arguments passed to 'plot_contour'.
+        dfs : list of pandas.DataFrame
+            List of dataframes containing x, y, z columns.
+        x_col, y_col, z_col : str
+            Column names of x-axis, y-axis, and z-axis.
+        ncols : int, default=2
+            Number of columns in subplot grid.
+        share_norm : bool, default=True
+            If True, all subplots share the same normalization.
+        norm : matplotlib.colors.Normalize, optional
+            Custom normalization (overrides vmin/vmax if provided).
+        vmin, vmax : float, optional
+            Global normalization bounds (only used if norm=None).
+        levels : int or sequence, default=10
+            Number of contour levels or explicit list of levels.
+        figsize: tuple, default=(10, 6)
+            Size of the entire figure.
+        **kwargs :
+            Additional arguments passed to 'plot_contour'.
 
     Returns:
-    dict
-        Dictionary containing subplot axes and contour handles.
+        dict
+            Dictionary containing subplot axes and contour handles.
     """
     nplots = len(dfs)
     nrows = (nplots + ncols - 1) // ncols
@@ -184,36 +188,41 @@ def plot_multiple_contours(
 
     # --- Shared normalization ------------------------------------------------
     if share_norm:
-        if norm is None:
-            # compute global min/max across all dfs
-            all_vals = []
-            for df in dfs:
-                pivot_df = df.pivot_table(index=y_col, columns=x_col, values=z_col)
-                all_vals.append(pivot_df.values)
-            data_min = min(float(arr.min()) for arr in all_vals)
-            data_max = max(float(arr.max()) for arr in all_vals)
-            norm = mpl.colors.Normalize(
-                vmin=data_min if vmin is None else vmin,
-                vmax=data_max if vmax is None else vmax,
-            )
+        all_data = np.concatenate([df[z_col].to_numpy().ravel() for df in dfs])
+        global_vmin, global_vmax = np.nanmin(all_data), np.nanmax(all_data)
+        global_norm = mpl.colors.Normalize(vmin=global_vmin, vmax=global_vmax)
     else:
-        norm = None
+        global_norm = None
 
     results = []
     for i, df in enumerate(dfs):
-        res = plot_contour(
-            df,
-            x_col=x_col,
-            y_col=y_col,
-            z_col=z_col,
-            ax=axes[i],
-            norm=norm if share_norm else None,
-            vmin=vmin if not share_norm else None,
-            vmax=vmax if not share_norm else None,
-            **kwargs,
-        )
+        if share_norm:
+            # shared normalization → use *only* the same norm
+            res = plot_contour(
+                df,
+                x_col=x_col,
+                y_col=y_col,
+                z_col=z_col,
+                ax=axes[i],
+                norm=global_norm,
+                vmin=vmin,
+                vmax=vmax,
+                **kwargs,
+            )
+        else:
+            # independent normalization
+            res = plot_contour(
+                df,
+                x_col=x_col,
+                y_col=y_col,
+                z_col=z_col,
+                ax=axes[i],
+                levels=levels,
+                **kwargs,
+            )
         results.append(res)
 
+    # --- Colorbar (only for shared normalization) ----------------------------
     filled_example = next(
         (r["filled"] for r in results if r["filled"] is not None), None
     )
@@ -222,7 +231,7 @@ def plot_multiple_contours(
     else:
         cbar = None
 
-    # Turn of unused axes
+    # Turn off unused axes
     for j in range(nplots, len(axes)):
         axes[j].axis("off")
 
