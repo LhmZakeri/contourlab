@@ -14,10 +14,8 @@ X, Y = np.meshgrid(x, y)
 Z = np.exp(-(X**2 + Y**2) / 5) + 0.05 * np.random.randn(*X.shape)
 
 df = pd.DataFrame({"x": X.ravel(), "y": Y.ravel(), "z": Z.ravel()})
-filtered = filter_high_values(df, prob_col="z", threshold=0.1, group_cols=["x", "y"])
+filtered = filter_high_values(df, prob_col="z", threshold=0.6, group_cols=["x", "y"])
 
-print(df.shape)
-print(filtered.shape)
 
 res = plot_contour(
     filtered,

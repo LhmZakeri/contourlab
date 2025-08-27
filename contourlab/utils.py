@@ -1,7 +1,9 @@
 import numpy as np
 from scipy.interpolate import griddata
-import pandas as pd 
+import pandas as pd
 from typing import List
+
+
 # -----------------------------------------------------------------------------
 def interpolate_grid(
     X: np.ndarray,
@@ -11,12 +13,33 @@ def interpolate_grid(
     method: str = "cubic",
 ):
     """Interpolate data onto a finer grid for smooth contours."""
+    # --- mask Invalid points --------------------------------------------------
+    mask = np.isfinite(X) & np.isfinite(Y) & np.isfinite(Z)
+    if mask.sum() < 3:
+        return X, Y, np.ma.masked_invalid(Z)
+    
+    x_flat, y_flat, z_flat = X.flatten(), Y.flatten(), Z.flatten()
+    mask_flat = mask.flatten()
+    # --- Build finer grid -----------------------------------------------------
     X_fine = np.linspace(np.nanmin(X), np.nanmax(X), resolution)
     Y_fine = np.linspace(np.nanmin(Y), np.nanmax(Y), resolution)
     X_fine, Y_fine = np.meshgrid(X_fine, Y_fine)
+    # --- Interpolate only from valid samples ----------------------------------
     Z_fine = griddata(
-        (X.flatten(), Y.flatten()), Z.flatten(), (X_fine, Y_fine), method=method
+        (X.flatten()[mask_flat], Y.flatten()[mask_flat]),
+        Z.flatten()[mask_flat],
+        (X_fine, Y_fine),
+        method=method,
     )
+    # Fallback : if result is all NaN (common for cubic on sparse grids),retry
+    # with 'nearest'
+    if Z_fine is None or np.all(~np.isfinite(Z_fine)):
+        Z_fine = griddata(
+            (X.flatten()[mask_flat], Y.flatten()[mask_flat]),
+            Z.flatten()[mask_flat],
+            (X_fine, Y_fine),
+            method="nearest",
+        )
     return X_fine, Y_fine, Z_fine
 
 
@@ -40,6 +63,7 @@ def highlight_region(
     # Mask values below threshold
     Z_highlight = np.where(Z >= threshold, Z, Zmin - 1.0)
     return ax.contourf(X, Y, Z_highlight, levels=fill_levels, cmap=cmap)
+
 
 # -----------------------------------------------------------------------------
 def filter_high_values(
@@ -77,4 +101,4 @@ def filter_high_values(
         )
         .reset_index(drop=True)
     )
-    return out 
+    return out
