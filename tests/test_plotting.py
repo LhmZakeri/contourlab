@@ -3,7 +3,11 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from contourlab.plotting import plot_contour, plot_multiple_contours
+from contourlab.plotting import (
+    plot_contour,
+    plot_multiple_contours,
+    stack_contours_in_z,
+)
 
 # -----------------------------------------------------------------------------
 
@@ -112,3 +116,32 @@ def test_plot_multiple_contours_independent_norm(sample_df):
 
     # At least one bound should differ (since ranges are different)
     assert not (len(set(vmins)) == 1 and len(set(vmaxs)) == 1)
+
+
+# -----------------------------------------------------------------------------
+def test_stack_contours_default_offsets(sample_df):
+    # build two contour sets with different z to ensure multiple slices
+    res1 = plot_contour(
+        sample_df, x_col="x", y_col="y", z_col="z", annotate=False, highlight=False
+    )
+    df2 = sample_df.copy()
+    df2["z"] *= 2
+    res2 = plot_contour(
+        df2, x_col="x", y_col="y", z_col="z", annotate=False, highlight=False
+    )
+
+    out = stack_contours_in_z([res1["contour"], res2["contour"]])
+    offs = out["z_offsets"]
+    assert len(offs) == 2
+    assert offs[1] > offs[0]
+
+
+# -----------------------------------------------------------------------------
+
+
+def test_stack_contours_custom_offsets(sample_df):
+    res = plot_contour(
+        sample_df, x_col="x", y_col="y", z_col="z", annotate=False, highlight=False
+    )
+    out = stack_contours_in_z([res["contour"], res["contour"]], z_offsets=[0.0, 3.5])
+    assert out["z_offsets"] == [0.0, 3.5]
