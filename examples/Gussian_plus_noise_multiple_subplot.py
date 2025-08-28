@@ -30,7 +30,7 @@ contours_list = [r["contour"] for r in res_multi["results"]]
 
 res_3d = stack_contours_in_z(
     contours_list,
-    z_gap=1.0,
+    z_gap=0.2,
     elev=30, 
     azim=-45
 )

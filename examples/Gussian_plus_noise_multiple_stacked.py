@@ -23,15 +23,19 @@ res_multi = plot_multiple_contours(
     z_col="z",
     share_norm=True,  # force both plots to use the same scale
     ncols=2,
-    cmap="plasma",
+    cmap="coolwarm",
 )
 
 contours_list = [r["contour"] for r in res_multi["results"]]
 
 res_3d = stack_contours_in_z(
     contours_list,
-    z_gap=1.0,
+    z_gap=10.0,
     elev=30, 
-    azim=-45
+    azim=-45, 
+    mode="filled",
+    alpha=0.5, 
+    show_lines=True,
+    cmap="coolwarm"
 )
 plt.show()
