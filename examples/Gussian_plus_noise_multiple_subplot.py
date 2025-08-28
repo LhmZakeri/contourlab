@@ -17,12 +17,12 @@ df2 = df.copy()
 df2["z"] *= 1.5
 
 res_multi = plot_multiple_contours(
-    [df, df2],
+    [df, df2, df, df, df2],
     x_col="x",
     y_col="y",
     z_col="z",
     share_norm=True,  # force both plots to use the same scale
-    ncols=2,
+    ncols=3,
     cmap="plasma",
 )
 
@@ -30,7 +30,7 @@ contours_list = [r["contour"] for r in res_multi["results"]]
 
 res_3d = stack_contours_in_z(
     contours_list,
-    z_gap=0.2,
+    z_gap=2,
     elev=30, 
     azim=-45
 )

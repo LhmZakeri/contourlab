@@ -23,6 +23,7 @@ res = plot_contour(
     interp=True,  # smoother surface
     add_colorbar=True,  # show colorbar
     cmap="Blues",
+    show_stats=True
 )
 
 plt.show()

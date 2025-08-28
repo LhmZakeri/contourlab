@@ -36,6 +36,18 @@ res_3d = stack_contours_in_z(
     mode="filled",
     alpha=0.5, 
     show_lines=True,
-    cmap="coolwarm"
+    cmap="coolwarm",
 )
+
+res_3d = stack_contours_in_z(
+    contours_list,
+    z_gap=10.0,
+    elev=30, 
+    azim=-45, 
+    mode="line",
+    alpha=0.5, 
+    show_lines=True,
+    cmap="coolwarm",
+)
+
 plt.show()

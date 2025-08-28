@@ -18,6 +18,7 @@ def plot_contour(
     interp: bool = True,
     highlight: bool = True,
     annotate: bool = True,
+    show_stats: bool = True,
     storytelling: bool = False,
     story_labels: Optional[Dict[float, str]] = None,
     cmap: str = "Blues",
@@ -123,7 +124,7 @@ def plot_contour(
     contour_filled = ax.contourf(
         X, Y, Z, levels=levels, cmap=cmap, norm=norm, extend="both"
     )
-
+    
     # --- Colorbar ------------------------------------------------------------
     if add_colorbar and contour_filled is not None:
         colorbar = plt.colorbar(contour_filled, ax=ax)
@@ -246,8 +247,8 @@ def stack_contours_in_z(
     figsize: tuple = (10, 8),
     elev: int = 22,
     azim: int = -60,
-    mode: str = "line",       # "line" or "filled"
-    alpha: float = 0.6,       # transparency for filled
+    mode: str = "line",  # "line" or "filled"
+    alpha: float = 0.6,  # transparency for filled
     show_lines: bool = True,  # show contour lines in filled mode
     cmap: Optional[str] = None,  # colormap for filled mode
 ) -> Dict[str, object]:
@@ -361,8 +362,6 @@ def stack_contours_in_z(
                         z = np.full_like(x, z_level, dtype=float)  # match band z
                         ax.plot(x, y, z, color="k", linewidth=0.5)
 
-
-
         # slice box
         ax.plot(
             [gx_min, gx_max, gx_max, gx_min, gx_min],
@@ -385,5 +384,3 @@ def stack_contours_in_z(
     plt.tight_layout()
 
     return {"fig": fig, "ax": ax, "z_offsets": offsets}
-
-
