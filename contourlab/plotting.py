@@ -185,10 +185,7 @@ def plot_multiple_contours(
     nplots = len(dfs)
     nrows = (nplots + ncols - 1) // ncols
     fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize)
-    if not isinstance(axes, np.ndarray):
-        axes = np.array([axes])
-    else:
-        axes = axes.ravel()
+    axes = np.atleast_1d(axes).ravel()
 
     # --- Shared normalization ------------------------------------------------
     if share_norm:
