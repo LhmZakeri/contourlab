@@ -85,7 +85,7 @@ def plot_contour(
     if isinstance(levels, int):
         levels = np.linspace(data_min, data_max, levels)
     else:
-        levels = np.asarray(levels, dtype=float)
+        levels = np.asarray(levels, dtype=float).ravel()
         if levels.min() > data_min:
             levels = np.insert(levels, 0, data_min)
         if levels.max() < data_max:
@@ -148,87 +148,122 @@ def plot_multiple_contours(
     z_col: str,
     ncols: int = 2,
     share_norm: bool = True,
-    norm: Optional[mpl.colors.Normalize] = None,
-    vmin: Optional[float] = None,
-    vmax: Optional[float] = None,
-    levels: Optional[int] = 10,
+    norm: Optional[Union[mpl.colors.Normalize, Sequence[mpl.colors.Normalize]]] = None,
+    vmin: Optional[Union[float, Sequence[float]]] = None,
+    vmax: Optional[Union[float, Sequence[float]]] = None,
+    levels: Optional[Union[int, Sequence[float]]] = 10,
     figsize: tuple = (10, 6),
+    add_colorbar: bool = True,
+    story_labels: Optional[Dict[float, str]] = None,   # <-- NEW
+    storytelling: bool = False,                       # <-- NEW
     **kwargs,
 ) -> Dict[str, object]:
     """
-    Plot multiple contour maps in a grid layout.
-
-    Args:
-        dfs : list of pandas.DataFrame
-            List of dataframes containing x, y, z columns.
-        x_col, y_col, z_col : str
-            Column names of x-axis, y-axis, and z-axis.
-        ncols : int, default=2
-            Number of columns in subplot grid.
-        share_norm : bool, default=True
-            If True, all subplots share the same normalization.
-        norm : matplotlib.colors.Normalize, optional
-            Custom normalization (overrides vmin/vmax if provided).
-        vmin, vmax : float, optional
-            Global normalization bounds (only used if norm=None).
-        levels : int or sequence, default=10
-            Number of contour levels or explicit list of levels.
-        figsize: tuple, default=(10, 6)
-            Size of the entire figure.
-        **kwargs :
-            Additional arguments passed to 'plot_contour'.
-
-    Returns:
-        dict
-            Dictionary containing subplot axes and contour handles.
+    Plot multiple contour maps in a grid layout with optional storytelling colorbars.
     """
+
     nplots = len(dfs)
     nrows = (nplots + ncols - 1) // ncols
     fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize)
     axes = np.atleast_1d(axes).ravel()
 
-    # --- Shared normalization ------------------------------------------------
-    if share_norm:
-        all_data = np.concatenate([df[z_col].to_numpy().ravel() for df in dfs])
-        global_vmin, global_vmax = np.nanmin(all_data), np.nanmax(all_data)
-        global_norm = mpl.colors.Normalize(vmin=global_vmin, vmax=global_vmax)
-    else:
-        global_norm = None
-
     results = []
-    for i, df in enumerate(dfs):
-        if share_norm:
-            # shared normalization → use *only* the same norm
-            res = plot_contour(
-                df,
-                x_col=x_col,
-                y_col=y_col,
-                z_col=z_col,
-                ax=axes[i],
-                norm=global_norm,
-                vmin=vmin,
-                vmax=vmax,
-                **kwargs,
-            )
+
+    # --- Shared normalization ---------------------------------------------
+    if share_norm:
+        if norm is not None:
+            global_norm = norm
         else:
-            # independent normalization
-            res = plot_contour(
-                df,
-                x_col=x_col,
-                y_col=y_col,
-                z_col=z_col,
-                ax=axes[i],
-                levels=levels,
-                **kwargs,
-            )
+            all_data = np.concatenate([df[z_col].to_numpy().ravel() for df in dfs])
+            global_vmin = np.nanmin(all_data) if vmin is None else vmin
+            global_vmax = np.nanmax(all_data) if vmax is None else vmax
+            global_norm = mpl.colors.Normalize(vmin=global_vmin, vmax=global_vmax)
+
+    # --- Plot each subplot ------------------------------------------------
+    for i, df in enumerate(dfs):
+        ax = axes[i]
+
+        if isinstance(levels, (list, tuple)) and isinstance(levels[0], (np.ndarray, list)):
+            local_levels = np.asarray(levels[i], dtype=float).ravel()
+        else:
+            local_levels = levels
+
+        if share_norm:
+            local_norm = global_norm
+        else:
+            if norm is not None:
+                local_norm = norm[i] if isinstance(norm, (list, tuple)) else norm
+            else:
+                local_vmin = vmin[i] if isinstance(vmin, (list, tuple)) else vmin
+                local_vmax = vmax[i] if isinstance(vmax, (list, tuple)) else vmax
+                if local_vmin is None or local_vmax is None:
+                    zvals = df[z_col].to_numpy().ravel()
+                    if local_vmin is None:
+                        local_vmin = np.nanmin(zvals)
+                    if local_vmax is None:
+                        local_vmax = np.nanmax(zvals)
+                local_norm = mpl.colors.Normalize(vmin=local_vmin, vmax=local_vmax)
+
+        # plot the contour
+        res = plot_contour(
+            df,
+            x_col=x_col,
+            y_col=y_col,
+            z_col=z_col,
+            ax=ax,
+            norm=local_norm,
+            levels=local_levels,
+            **kwargs,
+        )
         results.append(res)
 
-    # --- Colorbar (only for shared normalization) ----------------------------
-    filled_example = next(
-        (r["filled"] for r in results if r["filled"] is not None), None
-    )
-    if share_norm and filled_example is not None:
-        cbar = fig.colorbar(filled_example, ax=axes, orientation="vertical", shrink=0.8)
+        # individual colorbar
+        if add_colorbar and not share_norm and res["filled"] is not None:
+            cbar = fig.colorbar(res["filled"], ax=ax, orientation="vertical", shrink=0.8)
+
+            # storytelling ticks & labels
+            if storytelling:
+                if isinstance(levels, (list, tuple)) and isinstance(levels[0], (np.ndarray, list)):
+                    # subplot-specific levels
+                    local_ticks = np.asarray(levels[i], dtype=float).ravel()
+                    
+                    if story_labels is not None:
+                        # derive labels relative to local max
+                        vmax_local = local_ticks.max()
+                        labels = []
+                        for v in local_ticks:
+                            diff = vmax_local - v
+                            if np.isclose(diff, 0):
+                                labels.append("Max")
+                            else:
+                                perc = int(round(diff / vmax_local * 100))
+                                labels.append(f"Max-{perc}%")
+                    else:
+                        labels = [f"{v:.2f}" for v in local_ticks]
+                else:
+                    # fallback: global story_labels dictionary
+                    local_ticks = list(story_labels.keys())
+                    labels = [story_labels[v] for v in local_ticks]
+
+                cbar.set_ticks(local_ticks)
+                cbar.set_ticklabels(labels)
+
+
+    # --- Global colorbar --------------------------------------------------
+    if share_norm and add_colorbar:
+        filled_example = next(
+            (r["filled"] for r in results if r["filled"] is not None), None
+        )
+        if filled_example is not None:
+            cbar = fig.colorbar(filled_example, ax=axes, orientation="vertical", shrink=0.8)
+
+            if storytelling and story_labels is not None:
+                ticks = list(story_labels.keys())
+                labels = [story_labels[v] for v in ticks]
+                cbar.set_ticks(ticks)
+                cbar.set_ticklabels(labels)
+        else:
+            cbar = None
     else:
         cbar = None
 
@@ -237,7 +272,6 @@ def plot_multiple_contours(
         axes[j].axis("off")
 
     return {"fig": fig, "axes": axes, "results": results, "colorbar": cbar}
-
 
 # -------------------------------------------------------------------------
 def stack_contours_in_z(
