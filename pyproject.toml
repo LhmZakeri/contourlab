@@ -8,6 +8,10 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["numpy", "pandas", "matplotlib"]
 
+[options.entry_points]
+console_scripts =
+    contourlab = contourlab.cli:main
+
 [build-system]
 requires = ["setuptools>=65.5.0", "wheel"]
 build-backend = "setuptools.build_meta"
