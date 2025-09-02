@@ -4,12 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib as mpl
 
-import os, sys
-
-home_dir = os.path.expanduser("~")
-utils_path = os.path.join(home_dir, "contourlab/contourlab")
-sys.path.append(utils_path)
-from utils import interpolate_grid, highlight_region
+from .utils import interpolate_grid, highlight_region
 
 
 # -----------------------------------------------------------------------------

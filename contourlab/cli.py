@@ -23,12 +23,13 @@ def main():
     parser.add_argument("--interp", action="store_true", help="Interpolate grid")
     parser.add_argument("--ncols", type=int, default=2, help="Subplot columns for 2d-multiple")
     parser.add_argument("--output", type=str, default=None, help="Save figure to file")
+    parser.add_argument("--sep", type=str, default=",", help="Column separator for input file (default: comma)")
 
     args = parser.parse_args()
 
     # Load CSVs
     try:
-        dfs = [pd.read_csv(f) for f in args.csv]
+        dfs = [pd.read_csv(f, sep=args.sep) for f in args.csv]
     except Exception as e:
         print(f"Error reading CSV file(s): {e}")
         sys.exit(1)
