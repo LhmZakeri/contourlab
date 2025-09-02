@@ -4,7 +4,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib as mpl
 
-from .utils import interpolate_grid, highlight_region
+import os, sys
+
+home_dir = os.path.expanduser("~")
+utils_path = os.path.join(home_dir, "contourlab/contourlab")
+sys.path.append(utils_path)
+from utils import interpolate_grid, highlight_region
 
 
 # -----------------------------------------------------------------------------
@@ -27,6 +32,13 @@ def plot_contour(
     norm: Optional[mpl.colors.Normalize] = None,
     vmin: Optional[float] = None,
     vmax: Optional[float] = None,
+    xlabels: Optional[str] = None,
+    ylabels: Optional[str] = None,
+    title: Optional[str] = None,
+    font_axis_label: int = 12,
+    font_tick: int = 10,
+    font_annotation: int = 8,
+    font_title: int = 14,
 ) -> Dict[str, object]:
     """
     Plot a contour map from a DataFrame with optional interpolation.
@@ -94,8 +106,14 @@ def plot_contour(
     # --- Axes ---------------------------------------------------------------
     if ax is None:
         fig, ax = plt.subplots(figsize=(6, 5))
-
-    # --- Contour lines -------------------------------------------------------
+    # --- Apply labels & ticks -----------------------------------------------
+    if xlabels:
+        ax.set_xlabel(xlabels, fontsize=font_axis_label)
+    if ylabels:
+        ax.set_ylabel(ylabels, fontsize=font_axis_label)
+    ax.tick_params(axis="x", labelsize=font_tick)
+    ax.tick_params(axis="y", labelsize=font_tick)
+    # --- Contour lines ------------------------------------------------------
     contour_lines = ax.contour(X, Y, Z, levels=levels, colors="k", linewidths=1.0)
 
     if annotate:
@@ -103,11 +121,11 @@ def plot_contour(
             ax.clabel(
                 contour_lines,
                 inline=True,
-                fontsize=8,
+                fontsize=font_annotation,
                 fmt=lambda v: story_labels.get(v, f"{v:.3f}"),
             )
         else:
-            ax.clabel(contour_lines, inline=True, fontsize=8, fmt="%.2f")
+            ax.clabel(contour_lines, inline=True, fontsize=font_annotation, fmt="%.2f")
 
     # --- Filled contours -----------------------------------------------------
     contour_filled, colorbar = None, None
@@ -124,15 +142,16 @@ def plot_contour(
     contour_filled = ax.contourf(
         X, Y, Z, levels=levels, cmap=cmap, norm=norm, extend="both"
     )
-    
+    # --- Title ---------------------------------------------------------------
+    if title:
+        ax.set_title(title, fontsize=font_title)
     # --- Colorbar ------------------------------------------------------------
     if add_colorbar and contour_filled is not None:
         colorbar = plt.colorbar(contour_filled, ax=ax)
         if storytelling and story_labels:
             colorbar.set_ticks(list(story_labels.keys()))
             colorbar.set_ticklabels(list(story_labels.values()))
-        colorbar.ax.tick_params(labelsize=12)
-
+        colorbar.ax.tick_params(labelsize=font_axis_label)
     return {
         "contour": contour_lines,
         "filled": contour_filled,
@@ -154,8 +173,16 @@ def plot_multiple_contours(
     levels: Optional[Union[int, Sequence[float]]] = 10,
     figsize: tuple = (10, 6),
     add_colorbar: bool = True,
-    story_labels: Optional[Dict[float, str]] = None,   # <-- NEW
-    storytelling: bool = False,                       # <-- NEW
+    story_labels: Optional[Dict[float, str]] = None,
+    storytelling: bool = False,
+    xlabels: Optional[str] = None,
+    ylabels: Optional[str] = None,
+    titles: Optional[Sequence[str]] = None,
+    font_axis_label: int = 12,
+    font_tick: int = 10,
+    font_annotation: int = 8,
+    font_title: int = 14,
+    cbar_fontsize: int = 10,
     **kwargs,
 ) -> Dict[str, object]:
     """
@@ -183,7 +210,9 @@ def plot_multiple_contours(
     for i, df in enumerate(dfs):
         ax = axes[i]
 
-        if isinstance(levels, (list, tuple)) and isinstance(levels[0], (np.ndarray, list)):
+        if isinstance(levels, (list, tuple)) and isinstance(
+            levels[0], (np.ndarray, list)
+        ):
             local_levels = np.asarray(levels[i], dtype=float).ravel()
         else:
             local_levels = levels
@@ -213,20 +242,32 @@ def plot_multiple_contours(
             ax=ax,
             norm=local_norm,
             levels=local_levels,
+            xlabels=(xlabels[i] if xlabels else None),
+            ylabels=(ylabels[i] if ylabels else None),
+            title=(titles[i] if titles else None),
+            font_axis_label=font_axis_label,
+            font_tick=font_tick,
+            font_annotation=font_annotation,
+            font_title=font_title,
+
             **kwargs,
         )
         results.append(res)
 
         # individual colorbar
         if add_colorbar and not share_norm and res["filled"] is not None:
-            cbar = fig.colorbar(res["filled"], ax=ax, orientation="vertical", shrink=0.8)
-
+            cbar = fig.colorbar(
+                res["filled"], ax=ax, orientation="vertical", shrink=0.8
+            )
+            cbar.ax.tick_params(labelsize=cbar_fontsize)
             # storytelling ticks & labels
             if storytelling:
-                if isinstance(levels, (list, tuple)) and isinstance(levels[0], (np.ndarray, list)):
+                if isinstance(levels, (list, tuple)) and isinstance(
+                    levels[0], (np.ndarray, list)
+                ):
                     # subplot-specific levels
                     local_ticks = np.asarray(levels[i], dtype=float).ravel()
-                    
+
                     if story_labels is not None:
                         # derive labels relative to local max
                         vmax_local = local_ticks.max()
@@ -248,14 +289,15 @@ def plot_multiple_contours(
                 cbar.set_ticks(local_ticks)
                 cbar.set_ticklabels(labels)
 
-
     # --- Global colorbar --------------------------------------------------
     if share_norm and add_colorbar:
         filled_example = next(
             (r["filled"] for r in results if r["filled"] is not None), None
         )
         if filled_example is not None:
-            cbar = fig.colorbar(filled_example, ax=axes, orientation="vertical", shrink=0.8)
+            cbar = fig.colorbar(
+                filled_example, ax=axes, orientation="vertical", shrink=0.8
+            )
 
             if storytelling and story_labels is not None:
                 ticks = list(story_labels.keys())
@@ -272,6 +314,7 @@ def plot_multiple_contours(
         axes[j].axis("off")
 
     return {"fig": fig, "axes": axes, "results": results, "colorbar": cbar}
+
 
 # -------------------------------------------------------------------------
 def stack_contours_in_z(
