@@ -1,33 +1,21 @@
+[project]
+name = "contourlab"
+version = "0.1.0"
+description = "Contour plotting utilities"
+authors = [{ name="Elham", email="you@example.com" }]
+license = "MIT"  # SPDX expression
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy", "pandas", "matplotlib"]
+
 [build-system]
 requires = ["setuptools>=65.5.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[project]
-name = "contourlab"
-version = "0.1.0"
-description = "Toolkit for 2D contour plots and 3D stacked contour visualizations"
-readme = "README.md"
-license = "MIT"
-authors = [
-	{ name = "Elham Zakeri" , email="lhmzakeri@gmail.com"}
-	]
-requires-python = ">=3.9"
-dependencies = [
-    "numpy",
-    "pandas",
-    "matplotlib",
-    "scipy"
-]
-keywords = ["contour", "plot", "matplotlib", "3D"]
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent"
-]
+[tool.setuptools.packages.find]
+include = ["contourlab*"]
+exclude = ["data*"]
 
 [project.scripts]
 contourlab = "contourlab.cli:main"
 
-[tool.setuptool.packages.find]
-include = ["contourlab"]
-exclude = ["data*"]
