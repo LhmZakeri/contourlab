@@ -362,7 +362,7 @@ class MultiContourPlotter(ContourPlotter):
             single_size =  self.config.figsize
             figsize = (single_size[0] *ncols, single_size[1]* nrows)
 
-        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize, dfp=self.config.dpi)
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize, dpi=self.config.dpi)
         axes = np.atleast_1d(axes).ravel()
 
         results = []

@@ -2,12 +2,13 @@ import warnings
 
 warnings.simplefilter("always", UserWarning)
 from dataclasses import dataclass
-from typing import Union, Sequence, Tuple, Optional, Dict, Any
+from typing import Union, Sequence, Tuple, Optional, Dict, Any, List
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
+from scipy.interpolate import griddata
 
 from utils import highlight_region
 # -----------------------------------------------------------------------
@@ -37,6 +38,7 @@ class PlotConfig:
     highlight: bool = False
     annotate: bool = True
     add_colorbar: bool = False
+    contour_filled: bool = False
 
     # --- Highlighting ---
     percentile_threshold: float = 80.0
@@ -97,7 +99,8 @@ class ConoturPlotter:
     # -------------------------------------------------------------------
 
     def _prepare_data_grid(
-        self, df: pd.DataFrame, x_col: str, y_col: str, z_col: str
+        self, df: pd.DataFrame, x_col: str, y_col: str, z_col: str, 
+        config: PlotConfig = None
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Convert DataFrame to grid format for contour plotting."""
         try:
@@ -106,7 +109,16 @@ class ConoturPlotter:
             )
             X, Y = np.meshgrid(pivot_df.columns, pivot_df.index)
             Z = pivot_df.values
-            return X, Y, Z
+
+            if config.interpolate:
+                xi = np.linspace(X.min(), X.max(), 200)  # finer grid
+                yi = np.linspace(Y.min(), Y.max(), 200)
+                Xi, Yi = np.meshgrid(xi, yi)
+                Zi = griddata((X.ravel(), Y.ravel()), Z.ravel(), (Xi, Yi), method='cubic')
+            else:
+                Xi, Yi, Zi = X, Y, Z
+
+            return Xi, Yi, Zi
 
         except Exception as e:
             raise ContourPlotError(f"Failed to prepare grid data: {e}")
@@ -281,7 +293,7 @@ class ConoturPlotter:
         # ---------------------------------------------------------------
         local_config = self._apply_config_override(kwargs)
         self._validate_dataframe(df, x_col, y_col, z_col)
-        X, Y, Z = self._prepare_data_grid(df, x_col, y_col, z_col)
+        X, Y, Z = self._prepare_data_grid(df, x_col, y_col, z_col, config=local_config)
         contour_levels = self._determine_levels(Z, levels, levels_step)
         
         created_fig = False
@@ -306,9 +318,14 @@ class ConoturPlotter:
             self._add_acontour_annotations(ax, contour_lines, colorbar_labels)
         
         contour_filled = None
-        if local_config.highlight:
+        if local_config.contour_filled and local_config.highlight:
+            raise ContourPlotError("Choose between highlight or filled method.")
+        if local_config.contour_filled or local_config.highlight:
             contour_filled = self._create_filled_contours(
-                ax, X, Y, Z, contour_levels, local_config, norm
+                ax, X, Y, Z, 
+                contour_levels,
+                local_config,
+                norm,
             )
         
         colorbar = None
@@ -328,6 +345,141 @@ class ConoturPlotter:
         }
 
         return results
+# -----------------------------------------------------------------------
+class MultiContourPlotter(ConoturPlotter):    
+    """ Extended plotter for multiple contour subplots."""
+
+    def _calculate_shared_normalization(
+        self, 
+        datasets: List[pd.DataFrame],
+        z_col: str
+    )-> Normalize:
+        
+        """Calculate shared normalization across all datasets."""
+        all_values = []
+        for df in datasets:
+            all_values.extend(df[z_col].dropna().tolist())
+        
+        return Normalize(vmin=np.nanmin(all_values), vmax = np.nanmax(all_values))
+    # -------------------------------------------------------------------
+    def _add_shared_colorbar(
+            self,
+            fig: plt.Figure,
+            axes: Union[plt.Axes, np.ndarray],
+            results: List[Dict[str, Any]],
+            shared_norm: Optional[Normalize] = None,
+            label: Optional[str] = None,
+            **kwargs):
+        """Add a shared colorbar for multiple subplots."""
+        filled_example = next(
+            (r["contour_filled"] for r in results if r["contour_filled"] is not None),
+            None
+        )
+        line_example = next(
+            (r["contour_lines"] for r in results if r["contour_lines"] is not None), 
+            None
+        )
+        mappable = filled_example or line_example
+        
+        if mappable is None: 
+            warnings.warn("No contour plots availabel for shared colorbar.")
+
+        cbar = fig.colorbar(
+            mappable,
+            ax = axes, 
+            orientation=kwargs.get("orientation", "vertical"),
+            shrink=kwargs.get("shrink", 0.8),
+            norm = shared_norm,
+        )
+
+        if label:
+            cbar.set_label(label, fontsize=self.config.font_colorbar)
+        
+        cbar.ax.tick_params(labelsize=self.config.font_colorbar)
+        return cbar
+    # -------------------------------------------------------------------
+    def plot_multiple_contours(
+        self,
+        datasets: Union[pd.DataFrame,List[pd.DataFrame]],
+        x_col : str,
+        y_col: str,
+        z_col: str,
+        ncols: int = 2,
+        shared_normalization: bool = True, 
+        titles: Optional[List[str]]= None,
+        x_labels: Optional[List[str]]=None,
+        y_labels: Optional[List[str]]=None,
+        show: bool= False,
+        savepath: Optional[str] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        
+        if len(datasets) == 0: 
+            raise ContourPlotError("No dataset is provided.")
+        for df in datasets:
+            if df.empty:
+                raise ContourPlotError("One of the DataFrames is empty.")
+        
+        nplots = len(datasets)
+        nrows = (nplots + ncols - 1)// ncols
+
+        figsize=kwargs.get("figsize")
+        if figsize is None:
+            single_size = self.config.figsize
+            figsize = (single_size[0]*ncols, single_size[1]*nrows)
+
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize,
+                                  dpi=self.config.dpi)
+        axes = np.atleast_1d(axes).ravel()
+
+        results = []
+
+        shared_norm = None
+        if shared_normalization:
+            shared_norm = self._calculate_shared_normalization(datasets, z_col)
+
+        for i, df in enumerate(datasets):
+            ax = axes[i]
+
+            title = titles[i] if titles and i < len(titles) else None
+            x_label = x_labels[i] if x_labels and i < len(x_labels) else None
+            y_label = y_labels[i] if y_labels and i < len(y_labels) else None
+
+            result = self.plot_single_contour(
+                df, x_col, y_col, z_col, 
+                ax = ax,
+                title=title,
+                x_label=x_label, 
+                y_label=y_label, 
+                norm = shared_norm,
+                add_colorbar=False,
+                **kwargs
+            )   
+            results.append(result)
+
+        # --- Turn off unused axes --------------------------------------
+        for j in range(nplots, len(axes)):
+            axes[j].axis("off")
+        
+        # --- Add shared colorbar if requested --------------------------
+        colorbar = None
+        if self.config.add_colorbar:
+            colorbar = self._add_shared_colorbar(fig, axes[:nplots], results, shared_norm)
+
+        # --- Finalize output(show or save)------------------------------
+        if savepath: 
+            fig.savefig(savepath, dpi=self.config.dpi, bbox_inches="tight")
+        if show:
+            plt.show()
+            
+        return{
+            "figure": fig,
+            "axes": axes[:nplots],
+            "results": results,
+            "colorbar": colorbar,
+            "shared_norm": shared_norm
+        }
+
 # =======================================================================
 if __name__ == "__main__":
 
@@ -335,14 +487,27 @@ if __name__ == "__main__":
 
     datadir = "/home/elham/EikonalOptim/data/new_fk_table_sigma51full.txt"
     data = pd.read_csv(datadir, sep="\s+")
-
-    contour = ConoturPlotter(config=plot_config)
-    results = contour.plot_single_contour(
-        df=data,
+    
+    mcp = MultiContourPlotter()
+    mcp.plot_multiple_contours(
+        datasets=[data, data],
         x_col="wavelength",
         y_col="aniso_phase",
         z_col="simdur",
-        levels = 10,
-    )
-    
-    print(results)
+        figsize=(10, 12),
+        titles=["(5, 5)","(5, 5)"],
+        y_labels=["one", "two"], 
+        levels=np.arange(560, 610), 
+        annotate=False,
+        show=True, 
+        highlight = True,
+        contour_filled = False,
+        percentile_threshold=80, 
+        shared_normalization=False, 
+        #add_colorbar= True, 
+        interpolate=True)
+
+
+
+
+
