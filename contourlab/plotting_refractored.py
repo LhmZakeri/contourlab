@@ -167,6 +167,28 @@ class ConoturPlotter:
             levels_arr = np.insert(arr=levels_arr, obj=len(levels_arr), values=data_max)
 
         return levels_arr
+    # -------------------------------------------------------------------
+    def _add_shared_colorbar(self, fig, axes, results, norm):
+        mappable = None
+        for res in results:
+            if "contour_filled" in res and res["contour_filled"] is not None:
+                mappable = res["contour_filled"]
+                break
+            elif "contour_lines" in res and res["contour_lines"] is not None:
+                mappable = res["contour_lines"]
+                break
+        if mappable is None:
+            raise ContourPlotError("No contour object found for shared colorbar.")
+
+        cbar = fig.colorbar(
+            mappable,
+            ax=axes,
+            orientation="vertical",
+            fraction=0.05,
+            pad=0.05
+        )
+        return cbar
+
 
     # -------------------------------------------------------------------
     def _setup_axes(
@@ -349,54 +371,79 @@ class ConoturPlotter:
 class MultiContourPlotter(ConoturPlotter):    
     """ Extended plotter for multiple contour subplots."""
 
+    # -------------------------------------------------------------------
+    def _collect_gridded_data(
+        self, 
+        datasets: List[pd.DataFrame], 
+        x_col: str, 
+        y_col: str, 
+        z_col: str
+    ) -> List[np.ndarray]:
+        """
+        Run all datasets through _prepare_data_grid and collect Z arrays.
+        This ensures normalization and level selection use gridded values.
+        """
+        X_all, Y_all, Z_all = [], [], []
+        for i, df in enumerate(datasets):
+            X, Y, Z = self._prepare_data_grid(
+                df=df, x_col=x_col, y_col=y_col, z_col=z_col, config=self.config
+            )
+            X_all.append(X)
+            Y_all.append(Y)
+            Z_all.append(Z)
+            print(f"Dataset {i}: grid shape {Z.shape}, range [{np.nanmin(Z):.2f}, {np.nanmax(Z):.2f}]")
+        return Z_all
+
+    # -------------------------------------------------------------------
     def _calculate_shared_normalization(
         self, 
-        datasets: List[pd.DataFrame],
-        z_col: str
+        Z_all: List[np.ndarray]
     )-> Normalize:
-        
-        """Calculate shared normalization across all datasets."""
-        all_values = []
-        for df in datasets:
-            all_values.extend(df[z_col].dropna().tolist())
-        
-        return Normalize(vmin=np.nanmin(all_values), vmax = np.nanmax(all_values))
+        """Calculate shared normalization across all gridded Z arrays."""
+        all_values = np.concatenate([Z.ravel() for Z in Z_all if Z is not None])
+        global_min, global_max = np.nanmin(all_values), np.nanmax(all_values)
+        print(f"Shared normalization range (from gridded Z): [{global_min:.2f}, {global_max:.2f}]")
+        return Normalize(vmin=global_min, vmax=global_max)
+
     # -------------------------------------------------------------------
-    def _add_shared_colorbar(
-            self,
-            fig: plt.Figure,
-            axes: Union[plt.Axes, np.ndarray],
-            results: List[Dict[str, Any]],
-            shared_norm: Optional[Normalize] = None,
-            label: Optional[str] = None,
-            **kwargs):
-        """Add a shared colorbar for multiple subplots."""
-        filled_example = next(
-            (r["contour_filled"] for r in results if r["contour_filled"] is not None),
-            None
-        )
-        line_example = next(
-            (r["contour_lines"] for r in results if r["contour_lines"] is not None), 
-            None
-        )
-        mappable = filled_example or line_example
-        
-        if mappable is None: 
-            warnings.warn("No contour plots availabel for shared colorbar.")
+    def _calculate_robust_shared_normalization(
+        self, 
+        Z_all: List[np.ndarray], 
+        vmin_percentile: float = 2.0, 
+        vmax_percentile: float = 98.0,
+    ) -> Normalize: 
+        """Robust normalization from gridded Z values using percentiles."""
+        all_values = np.concatenate([Z.ravel() for Z in Z_all if Z is not None])
+        vmin = np.percentile(all_values, vmin_percentile)
+        vmax = np.percentile(all_values, vmax_percentile)
+        print(f"Robust normalization {vmin_percentile}-{vmax_percentile} percentiles: [{vmin:.2f},{vmax:.2f}]")
+        return Normalize(vmin=vmin, vmax=vmax)
 
-        cbar = fig.colorbar(
-            mappable,
-            ax = axes, 
-            orientation=kwargs.get("orientation", "vertical"),
-            shrink=kwargs.get("shrink", 0.8),
-            norm = shared_norm,
-        )
+    # -------------------------------------------------------------------
+    def _create_adaptive_levels(
+        self, 
+        Z_all: List[np.ndarray], 
+        num_levels: int = 10, 
+        method: str = 'quantile', 
+    ) -> np.ndarray:
+        """Create levels from combined gridded Z arrays."""
+        all_values = np.concatenate([Z.ravel() for Z in Z_all if Z is not None])
 
-        if label:
-            cbar.set_label(label, fontsize=self.config.font_colorbar)
-        
-        cbar.ax.tick_params(labelsize=self.config.font_colorbar)
-        return cbar
+        if method == 'quantile': 
+            levels = np.quantile(all_values, np.linspace(0, 1, num_levels))
+        elif method == 'linear':
+            levels = np.linspace(np.nanmin(all_values), np.nanmax(all_values), num_levels)
+        elif method == 'log':
+            if np.nanmin(all_values) > 0 : 
+                levels = np.logspace(np.log10(np.nanmin(all_values)),
+                                     np.log10(np.nanmax(all_values)), num_levels)
+            else:
+                levels = np.linspace(np.nanmin(all_values), np.nanmax(all_values), num_levels)
+
+        print(f"Created {len(levels)} levels using '{method}' method")
+        print(f"Level range: [{levels[0]:.2f}, {levels[-1]:.2f}]")
+        return levels
+
     # -------------------------------------------------------------------
     def plot_multiple_contours(
         self,
@@ -406,6 +453,9 @@ class MultiContourPlotter(ConoturPlotter):
         z_col: str,
         ncols: int = 2,
         shared_normalization: bool = True, 
+        robust_normalization: bool = True, 
+        adaptive_levels: bool = True, 
+        level_method : str = 'quantile',
         titles: Optional[List[str]]= None,
         x_labels: Optional[List[str]]=None,
         y_labels: Optional[List[str]]=None,
@@ -420,6 +470,9 @@ class MultiContourPlotter(ConoturPlotter):
             if df.empty:
                 raise ContourPlotError("One of the DataFrames is empty.")
         
+        # --- Collect gridded Z for normalization/levels ----------------
+        Z_all = self._collect_gridded_data(datasets, x_col, y_col, z_col)
+
         nplots = len(datasets)
         nrows = (nplots + ncols - 1)// ncols
 
@@ -433,11 +486,38 @@ class MultiContourPlotter(ConoturPlotter):
         axes = np.atleast_1d(axes).ravel()
 
         results = []
+        add_colorbar = kwargs.pop('add_colorbar', self.config.add_colorbar)
 
+        if add_colorbar and shared_normalization:
+            individual_colorbars = False
+            shared_colorbar = True
+        elif add_colorbar and not shared_normalization:
+            individual_colorbars=True
+            shared_colorbar = False
+        else:
+            individual_colorbars = False
+            shared_colorbar = False
+
+        # --- Shared normalization from gridded Z ----------------------
         shared_norm = None
         if shared_normalization:
-            shared_norm = self._calculate_shared_normalization(datasets, z_col)
+            if robust_normalization:
+                shared_norm = self._calculate_robust_shared_normalization(Z_all)
+            else:
+                shared_norm = self._calculate_shared_normalization(Z_all)
 
+        # --- Levels from gridded Z ------------------------------------
+        levels = kwargs.pop('levels', None)
+        levels_step = kwargs.pop('levels_step', None)
+
+        if adaptive_levels and levels is None and levels_step is None:
+            levels = self._create_adaptive_levels(Z_all, method=level_method)
+            levels_step = None
+        elif levels is None and levels_step is None:
+            levels = self.config.levels
+            levels_step = None
+
+        # --- Plot each subplot ----------------------------------------
         for i, df in enumerate(datasets):
             ax = axes[i]
 
@@ -452,21 +532,20 @@ class MultiContourPlotter(ConoturPlotter):
                 x_label=x_label, 
                 y_label=y_label, 
                 norm = shared_norm,
-                add_colorbar=False,
+                add_colorbar=individual_colorbars,
+                levels=levels,
+                levels_step=levels_step,
                 **kwargs
             )   
             results.append(result)
 
-        # --- Turn off unused axes --------------------------------------
         for j in range(nplots, len(axes)):
             axes[j].axis("off")
         
-        # --- Add shared colorbar if requested --------------------------
         colorbar = None
-        if self.config.add_colorbar:
+        if shared_colorbar:
             colorbar = self._add_shared_colorbar(fig, axes[:nplots], results, shared_norm)
 
-        # --- Finalize output(show or save)------------------------------
         if savepath: 
             fig.savefig(savepath, dpi=self.config.dpi, bbox_inches="tight")
         if show:
@@ -487,25 +566,31 @@ if __name__ == "__main__":
 
     datadir = "/home/elham/EikonalOptim/data/new_fk_table_sigma51full.txt"
     data = pd.read_csv(datadir, sep="\s+")
-    
+    datadir = "/home/elham/EikonalOptim/data/new_fk_table_sigma93full.txt"
+    data2 = pd.read_csv(datadir, sep="\s+")
+
     mcp = MultiContourPlotter()
     mcp.plot_multiple_contours(
-        datasets=[data, data],
+        datasets=[data, data2],
         x_col="wavelength",
         y_col="aniso_phase",
         z_col="simdur",
         figsize=(10, 12),
         titles=["(5, 5)","(5, 5)"],
         y_labels=["one", "two"], 
-        levels=np.arange(560, 610), 
-        annotate=False,
+        levels=15, 
+        #levels_step = 1,
+        annotate=True,
         show=True, 
-        highlight = True,
-        contour_filled = False,
-        percentile_threshold=80, 
+        highlight = False,
+        contour_filled = True,
+        percentile_threshold=50, 
         shared_normalization=False, 
-        #add_colorbar= True, 
-        interpolate=True)
+        add_colorbar= True, 
+        interpolate=True, 
+        adaptive_levels=True,
+        robust_normalization=True,
+        level_method='quantile')
 
 
 
