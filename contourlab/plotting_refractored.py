@@ -58,7 +58,7 @@ class ContourPlotError(Exception):
 
 
 # -----------------------------------------------------------------------
-class ConoturPlotter:
+class ContourPlotter:
     """Main class for creating 2D contour plots with advanced features."""
 
     # -------------------------------------------------------------------
@@ -142,14 +142,16 @@ class ConoturPlotter:
         """
         data_min, data_max = float(np.nanmin(Z)), float(np.nanmax(Z))
 
+        user_provided_levels = isinstance(levels, (list, tuple, np.ndarray))
+
         if levels is not None and levels_step is not None:
             raise ContourPlotError("Specify either levels or step, not both.")
 
         if isinstance(levels, int):
             levels_arr = np.linspace(data_min, data_max, levels)
 
-        elif isinstance(levels, (list, tuple)):
-            levels_arr = np.asarray(levels, dtype=float).ravel()
+        elif user_provided_levels:
+            levels_arr = np.asanyarray(levels, dtype=float).ravel()
 
         elif isinstance(levels_step, (int, float)):
             levels_arr = np.arange(data_min, data_max + levels_step, step=levels_step)
@@ -161,10 +163,11 @@ class ConoturPlotter:
             levels_arr = np.linspace(data_min, data_max, self.config.levels)
 
         # --- Ensure levels cover data range ----------------------------
-        if levels_arr.min() > data_min:
-            levels_arr = np.insert(arr=levels_arr, obj=0, values=data_min)
-        if levels_arr.max() < data_max:
-            levels_arr = np.insert(arr=levels_arr, obj=len(levels_arr), values=data_max)
+        if not user_provided_levels and len(levels_arr) > 0:
+            if levels_arr.min() > data_min:
+                levels_arr = np.insert(arr=levels_arr, obj=0, values=data_min)
+            if levels_arr.max() < data_max:
+                levels_arr = np.insert(arr=levels_arr, obj=len(levels_arr), values=data_max)
 
         return levels_arr
     # -------------------------------------------------------------------
@@ -368,7 +371,7 @@ class ConoturPlotter:
 
         return results
 # -----------------------------------------------------------------------
-class MultiContourPlotter(ConoturPlotter):    
+class MultiContourPlotter(ContourPlotter):    
     """ Extended plotter for multiple contour subplots."""
 
     # -------------------------------------------------------------------
@@ -507,15 +510,14 @@ class MultiContourPlotter(ConoturPlotter):
                 shared_norm = self._calculate_shared_normalization(Z_all)
 
         # --- Levels from gridded Z ------------------------------------
-        levels = kwargs.pop('levels', None)
+        levels_arg = kwargs.pop('levels', None)
         levels_step = kwargs.pop('levels_step', None)
 
-        if adaptive_levels and levels is None and levels_step is None:
-            levels = self._create_adaptive_levels(Z_all, method=level_method)
-            levels_step = None
-        elif levels is None and levels_step is None:
-            levels = self.config.levels
-            levels_step = None
+        final_levels = None
+        if adaptive_levels and levels_arg is None and levels_step is None:
+            final_levels = self._create_adaptive_levels(Z_all, method=level_method)
+        elif levels_arg is not None and levels_step is None:
+            final_levels = levels_arg
 
         # --- Plot each subplot ----------------------------------------
         for i, df in enumerate(datasets):
@@ -525,6 +527,12 @@ class MultiContourPlotter(ConoturPlotter):
             x_label = x_labels[i] if x_labels and i < len(x_labels) else None
             y_label = y_labels[i] if y_labels and i < len(y_labels) else None
 
+            current_levels_for_plot = None
+            if isinstance(final_levels, list) and len(final_levels) == len(datasets):
+                current_levels_for_plot = final_levels[i]
+            else:
+                current_levels_for_plot = final_levels
+
             result = self.plot_single_contour(
                 df, x_col, y_col, z_col, 
                 ax = ax,
@@ -533,7 +541,7 @@ class MultiContourPlotter(ConoturPlotter):
                 y_label=y_label, 
                 norm = shared_norm,
                 add_colorbar=individual_colorbars,
-                levels=levels,
+                levels=current_levels_for_plot,
                 levels_step=levels_step,
                 **kwargs
             )   
@@ -564,21 +572,56 @@ if __name__ == "__main__":
 
     plot_config = PlotConfig(percentile_threshold=80, fill_alpha=0.5)
 
-    datadir = "/home/elham/EikonalOptim/data/new_fk_table_sigma51full.txt"
-    data = pd.read_csv(datadir, sep="\s+")
-    datadir = "/home/elham/EikonalOptim/data/new_fk_table_sigma93full.txt"
-    data2 = pd.read_csv(datadir, sep="\s+")
+    datadirs = [
+            "/home/elham/EikonalOptim/data/crn_table_sigma42.txt",
+            "/home/elham/EikonalOptim/data/crn_table_sigma51.txt",
+            "/home/elham/EikonalOptim/data/crn_table_sigma63.txt",
+            "/home/elham/EikonalOptim/data/crn_table_sigma82.txt",
+            "/home/elham/EikonalOptim/data/crn_table_sigma93.txt",
+        ]
 
+    dataset = []
+    levelsset = []
+    for datadir in datadirs:
+        data = pd.read_csv(datadir, sep="\s+")
+        dataset.append(data)
+        cp = ContourPlotter()
+        X, Y, Z = cp._prepare_data_grid(data, "aniso_phase", "wavelength", "simdur", config=plot_config)
+        Zmax = float(np.nanmax(Z))
+        
+        levels = np.array(
+            [
+                Zmax * (0.975),
+                Zmax * (0.98),
+                Zmax * (0.985), 
+                Zmax * (0.99),
+                Zmax * (0.995),
+                Zmax,
+
+            ],
+            dtype = float,
+        )
+        levelsset.append(levels)
+    
+    story_labels = {
+        levels[5]: "Max",
+        levels[4]: "Max-1%",
+        levels[3]: "Max-2%",
+        levels[2]: "Max-3%",
+        levels[1]: "Max-4%",
+        levels[0]: "Max-5%",
+    }
     mcp = MultiContourPlotter()
     mcp.plot_multiple_contours(
-        datasets=[data, data2],
-        x_col="wavelength",
-        y_col="aniso_phase",
+        datasets=dataset,
+        x_col="aniso_phase",
+        y_col="wavelength",
         z_col="simdur",
+        ncols=3,
         figsize=(10, 12),
-        titles=["(5, 5)","(5, 5)"],
+        titles=["Sigma (4, 2)", "Sigma (5, 5)", "Sigma (6, 2)", "Sigma (8, 4)", "Sigma (9, 3)"],
         y_labels=["one", "two"], 
-        levels=15, 
+        levels=levelsset, 
         #levels_step = 1,
         annotate=True,
         show=True, 
@@ -588,8 +631,8 @@ if __name__ == "__main__":
         shared_normalization=False, 
         add_colorbar= True, 
         interpolate=True, 
-        adaptive_levels=True,
-        robust_normalization=True,
+        adaptive_levels=False,
+        robust_normalization=False,
         level_method='quantile')
 
 
