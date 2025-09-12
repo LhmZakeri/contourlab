@@ -171,7 +171,7 @@ class ContourPlotter:
 
         return levels_arr
     # -------------------------------------------------------------------
-    def _add_shared_colorbar(self, fig, axes, results, norm):
+    def _add_shared_colorbar(self, fig, axes, results, norm, colorbar_labels_set=None):
         mappable = None
         for res in results:
             if "contour_filled" in res and res["contour_filled"] is not None:
@@ -190,6 +190,18 @@ class ContourPlotter:
             fraction=0.05,
             pad=0.05
         )
+        if colorbar_labels_set:
+            first_labels_dict = colorbar_labels_set[0]
+
+            tick_positions = mappable.levels
+
+            tick_labels = [label for val, label in sorted(first_labels_dict.items())]
+
+            if len(tick_positions) == len(tick_labels):
+                cbar.set_ticks(tick_positions)
+                cbar.set_ticklabels(tick_labels)
+                
+
         return cbar
 
 
@@ -462,6 +474,7 @@ class MultiContourPlotter(ContourPlotter):
         titles: Optional[List[str]]= None,
         x_labels: Optional[List[str]]=None,
         y_labels: Optional[List[str]]=None,
+        colorbar_labels_set: Optional[List[Dict]] = None,
         show: bool= False,
         savepath: Optional[str] = None,
         **kwargs
@@ -527,6 +540,10 @@ class MultiContourPlotter(ContourPlotter):
             x_label = x_labels[i] if x_labels and i < len(x_labels) else None
             y_label = y_labels[i] if y_labels and i < len(y_labels) else None
 
+            current_labels = None 
+            if colorbar_labels_set and i < len(colorbar_labels_set):
+                current_labels = colorbar_labels_set[i]
+
             current_levels_for_plot = None
             if isinstance(final_levels, list) and len(final_levels) == len(datasets):
                 current_levels_for_plot = final_levels[i]
@@ -542,6 +559,7 @@ class MultiContourPlotter(ContourPlotter):
                 norm = shared_norm,
                 add_colorbar=individual_colorbars,
                 levels=current_levels_for_plot,
+                colorbar_labels=current_labels,
                 levels_step=levels_step,
                 **kwargs
             )   
@@ -552,7 +570,7 @@ class MultiContourPlotter(ContourPlotter):
         
         colorbar = None
         if shared_colorbar:
-            colorbar = self._add_shared_colorbar(fig, axes[:nplots], results, shared_norm)
+            colorbar = self._add_shared_colorbar(fig, axes[:nplots], results, shared_norm, colorbar_labels_set)
 
         if savepath: 
             fig.savefig(savepath, dpi=self.config.dpi, bbox_inches="tight")
@@ -582,6 +600,7 @@ if __name__ == "__main__":
 
     dataset = []
     levelsset = []
+    label_list = []
     for datadir in datadirs:
         data = pd.read_csv(datadir, sep="\s+")
         dataset.append(data)
@@ -591,6 +610,7 @@ if __name__ == "__main__":
         
         levels = np.array(
             [
+                Zmax * (0.97),
                 Zmax * (0.975),
                 Zmax * (0.98),
                 Zmax * (0.985), 
@@ -602,15 +622,16 @@ if __name__ == "__main__":
             dtype = float,
         )
         levelsset.append(levels)
-    
-    story_labels = {
-        levels[5]: "Max",
-        levels[4]: "Max-1%",
-        levels[3]: "Max-2%",
-        levels[2]: "Max-3%",
-        levels[1]: "Max-4%",
-        levels[0]: "Max-5%",
-    }
+        story_labels = {
+            levels[6]: "Max",
+            levels[5]: "Max-0.5%",
+            levels[4]: "Max-1.0%",
+            levels[3]: "Max-1.5%",
+            levels[2]: "Max-2.0%",
+            levels[1]: "Max-2.5%",
+            levels[0]: "Max-3.0%",
+        }
+        label_list.append(story_labels)
     mcp = MultiContourPlotter()
     mcp.plot_multiple_contours(
         datasets=dataset,
@@ -620,19 +641,20 @@ if __name__ == "__main__":
         ncols=3,
         figsize=(10, 12),
         titles=["Sigma (4, 2)", "Sigma (5, 5)", "Sigma (6, 2)", "Sigma (8, 4)", "Sigma (9, 3)"],
-        y_labels=["one", "two"], 
-        levels=levelsset, 
+        y_labels=["Mean of Success Rate", None, None, "Mean of Success Rate", None], 
+        levels=5,#levelsset, 
         #levels_step = 1,
         annotate=True,
         show=True, 
         highlight = False,
         contour_filled = True,
-        percentile_threshold=50, 
-        shared_normalization=False, 
+        percentile_threshold=60, 
+        shared_normalization=True, 
         add_colorbar= True, 
         interpolate=True, 
         adaptive_levels=False,
-        robust_normalization=False,
+        robust_normalization=True,
+        #colorbar_labels_set=label_list,
         level_method='quantile')
 
 
