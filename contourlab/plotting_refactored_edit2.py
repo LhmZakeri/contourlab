@@ -113,7 +113,7 @@ class ContourPlotter:
                 yi = np.linspace(Y.min(), Y.max(), 200)
                 Xi, Yi = np.meshgrid(xi, yi)
                 Zi = griddata((X.ravel(), Y.ravel()), Z.ravel(), (Xi, Yi), method='cubic')
-                
+
                 # Fallback : if result is all NaN (common for cubic on sparse grids), retry 
                 # with 'nearest
                 if Zi is None or np.all(~np.isfinite(Zi)):
@@ -317,7 +317,31 @@ class ContourPlotter:
 # -----------------------------------------------------------------------
 class MultiContourPlotter(ContourPlotter):    
     """ Extended plotter for multiple contour subplots."""
+    # -------------------------------------------------------------------
+    def _validate_multi_plot_options(self, adaptive_levels, levels_arg,
+                                      levels_step, highlight, contour_filled):
+        """Validate options specific to multi-contour plots."""
+        # Constraint 1: adaptive_levels vs. manual levels 
+        if adaptive_levels and (levels_arg is not None or levels_step is not None):
+            raise ContourPlotError(
+                "You cannot use 'adaptive_levels=True' in combination with "
+                "either 'levels_step'."
+                "Choose one method for setting the contour levels."
+            )
 
+        # Constraint 2: filled vs. highlight
+        if contour_filled and highlight:
+            raise ContourPlotError(
+                "You cannot set both 'contour_filled=True' and 'highlight=True'. "
+                "Please choose one method for filling the contours."
+            )
+        
+        # Constraint 3: highlight requires levels
+        if highlight and levels_arg is None: 
+            raise ContourPlotError(
+                "When 'highlight=True', you must provide the 'levels' argument. "
+                "The highlighting function needs specific levels to work correctly."
+            )
     # -------------------------------------------------------------------
     def _collect_gridded_data(
         self, 
@@ -422,7 +446,15 @@ class MultiContourPlotter(ContourPlotter):
         for df in datasets:
             if df.empty:
                 raise ContourPlotError("One of the DataFrames is empty.")
-        
+        # --- Validate options before proceeding ------------------------
+        levels_arg = kwargs.get('levels')
+        levels_step = kwargs.get('levels_step')
+        highlight = kwargs.get('highlight', self.config.highlight)
+        contour_filled = kwargs.get('contour_filled', self.config.contour_filled)
+
+        self._validate_multi_plot_options(
+            adaptive_levels, levels_arg, levels_step, highlight, contour_filled
+        )
         # --- Collect gridded Z for normalization/levels ----------------
         X_all, Y_all, Z_all  = self._collect_gridded_data(datasets, x_col, y_col, z_col, verbose=verbose)
         
@@ -511,8 +543,7 @@ class MultiContourPlotter(ContourPlotter):
             "results": results,
             "colorbar": colorbar,
             "shared_norm": shared_norm
-        }
-            
+        }      
 # =======================================================================
 if __name__ == "__main__":
     # -------------------------------------------------------------------
