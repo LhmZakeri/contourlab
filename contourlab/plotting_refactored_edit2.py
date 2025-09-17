@@ -113,6 +113,11 @@ class ContourPlotter:
                 yi = np.linspace(Y.min(), Y.max(), 200)
                 Xi, Yi = np.meshgrid(xi, yi)
                 Zi = griddata((X.ravel(), Y.ravel()), Z.ravel(), (Xi, Yi), method='cubic')
+                
+                # Fallback : if result is all NaN (common for cubic on sparse grids), retry 
+                # with 'nearest
+                if Zi is None or np.all(~np.isfinite(Zi)):
+                    Zi = griddata((X.ravel(), Y.ravel()), Z.ravel(), (Xi, Yi), method='nearest')
             else:
                 Xi, Yi, Zi = X, Y, Z
 
