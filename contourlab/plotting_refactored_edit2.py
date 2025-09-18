@@ -95,15 +95,32 @@ class ContourPlotError(Exception):
 
 # -----------------------------------------------------------------------
 class ContourPlotter:
-    """Main class for creating 2D contour plots with advanced features."""
+    """Main class for creating 2D contour plots with advanced features.
+    
+    This class handles data validation, grid preparation, and the generation
+    of both filled and line contour plots. It uses a configuration object
+    to style plots and manage behavior flags.
+    """
 
     # -------------------------------------------------------------------
     def __init__(self, config: Optional[PlotConfig] = None):
+        """
+        Initialize the ContourPlotter with a given configuration.
+
+        Parameters:
+        config: An optional PlotConfig object to customize plot settings.
+                       If None, a default configuration is used.
+        """
         self.config = config or PlotConfig()
         self._validate_configue()
     # -------------------------------------------------------------------
     def _validate_configue(self) -> None:
-        """Validate configuration parameters."""
+        """
+        Validate configuration parameters to ensure they are within valid ranges.
+        Raises:
+        ContourPlotError: If percentile_threshold or filled_alpha are out
+          of range.
+        """
         if (
             self.config.percentile_threshold < 0
             or self.config.percentile_threshold > 100
@@ -116,7 +133,19 @@ class ContourPlotter:
     def _validate_dataframe(
         self, df: pd.DataFrame, x_col: str, y_col: str, z_col: str
     ) -> None:
-        """Validate input DataFrame and columns."""
+        """Validates the input DataFrame and required columns.
+        
+        Parameters:
+            df: The pandas DataFrame to validate.
+            x_col: The name of the column for the x-axis
+            y_col: The name of the column for the y-axis
+            z_col: The name of the column for the z-axis 
+        Raises:
+            ContourPlotError: If the DataFrame is empty or a required column is 
+            missing.
+            UserWarning: If the number of data points is very low.
+        
+        """
         if df.empty:
             raise ContourPlotError("DataFrame is empty.")
 
@@ -139,7 +168,26 @@ class ContourPlotter:
         z_col: str, 
         config: PlotConfig = None
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Convert DataFrame to grid format for contour plotting."""
+        """
+        Converts scattered DataFrame data into a grid format suitable for contour
+        plotting.
+
+        Interpolation is performed if specified in the configuration.
+
+        Paramters:
+        df: The pandas DataFrame containing the data.
+        x_col: The column name for x-coordiantes.
+        y_col: The column name for y_coordinates.
+        z_col: The column name for z_coordinates.
+        config: A plotConfig object specifying plot settings.
+
+        Returns: 
+        A tuple of three Numpy arrays (X, y, Z) representing the gridded data.
+
+        Raises:
+        ContourPlotError: If the grid data preparation fails.
+
+        """
         try:
             pivot_df = df.pivot_table(
                 index=y_col, columns=x_col, values=z_col, aggfunc="mean"
@@ -165,7 +213,17 @@ class ContourPlotter:
             raise ContourPlotError(f"Failed to prepare grid data: {e}")
     # -------------------------------------------------------------------
     def _apply_config_override(self, overrides: Dict[str, Any]) -> PlotConfig:
-        """Create a local config with overrides applied."""
+        """
+        Creates a new PlotConfig instance by applying overrides to the current
+        config.
+
+        Parameters:
+        Override a dictionary of config attributes to override.
+
+        Returns:
+        A new PlotConfig object with the applied overrides.
+
+        """
         config_dict = self.config.__dict__.copy()
         config_dict.update(overrides)
         return PlotConfig(**config_dict)
@@ -177,7 +235,16 @@ class ContourPlotter:
         y_label: Optional[str],
         title: Optional[str],
     ) -> None:
-        """Configure axes labels, ticks, and title."""
+        """
+        Configures axis labels, ticks, and the title for a given subplot.
+
+        Parameters:
+        ax: The matplotlib Axes object to configure.
+        x_label: The label for the x-axis.
+        y_label: The label for the y-axis.
+        title: The title of the subplot.
+        
+        """
         if x_label:
             ax.set_xlabel(x_label, fontsize=self.config.font_axis_label)
         if y_label:
@@ -189,6 +256,25 @@ class ContourPlotter:
         ax.tick_params(axis="y", labelsize=self.config.font_tick)
     # -------------------------------------------------------------------
     def _add_shared_colorbar(self, fig, axes, results, norm , colorbar_labels_set=None):
+        """
+        Adds a single, shared colorbar for a set of subplots. 
+
+        This method finds a suitable mappable object from the list of plot results 
+        and creates a single colorbar that applies to all subplots.
+
+        Parameters:
+        fig: The matplotlib Figure object
+        axes: A list of matplotlib Axes objects.
+        results: A list of dictionaries containing plot results for each subplot.
+        norm: The normalization object for the color scale.
+        colorbar_labels_set: Optional dictionary of labels for the colorbar ticks.
+
+        Raises:
+        ContourPlotError: If no mappable contour object is found.
+
+        Returns:
+        The created matplotlib Colorbar object.
+        """
         mappable = None
         for res in results:
             if "contour_filled" in res and res["contour_filled"] is not None:
@@ -232,7 +318,24 @@ class ContourPlotter:
         config : PlotConfig, 
         norm : Optional[Normalize],
     ):
-        """Create filled contour regions."""
+        """
+        Creates filled contour regions on an Axes object.
+
+        This method can either use standard contour filling or a 
+        highlight function based on the configuration.
+
+        Params:
+        ax: The matplotlib Axes object for plotting.
+        X: The 2D array of x-coordinates.
+        Y: The 2D array of y-coordinates.
+        Z: The 2D array of z-values.
+        levels: The conotur levels.
+        config: The PlotConfig object.
+        norm: The normalization object.
+
+        Returns:
+        The matplotlib contourf or highlight object.
+        """
         if config.highlight:
             return highlight_region(
                 ax, 
@@ -254,7 +357,14 @@ class ContourPlotter:
         contour_lines,
         colorbar_labels,
     ) -> None: 
-        """Add inline labels to contour lines."""
+        """
+        Add inline labels to contour lines for better readability.
+        
+        Params:
+        ax: The matplotlib Axes object.
+        contour_lines: The contour lines object returned by ax.contour()
+        colorbar_labels: Optional dictionary of labels for the contour lines.
+        """
         if colorbar_labels:
             ax.clabel(
                 contour_lines,
@@ -277,7 +387,19 @@ class ContourPlotter:
         contour_filled, 
         colorbar_labels: Optional[Dict[str, float]]= None,
     ):
-        """Add colorbar to the plot"""
+        """
+        Adds a colorbar to a single plot.
+        
+        Parameters:
+        fig: The matplotlib Figure object.
+        ax: The matplotlib Axes object.
+        contour_filled: The filled contour object.
+        colorbar_labels: Optional dictionary of labels for the colorbar ticks.
+
+        Returns:
+        The created matplotlib Colorbar object.
+
+        """
         colorbar = fig.colorbar(contour_filled, ax=ax)
 
         if colorbar_labels:
@@ -301,7 +423,35 @@ class ContourPlotter:
         **kwargs
         )-> Dict[str, Any]:        
         """
-        Create a single contour plot
+        Creates and styles a single 2D plot.
+
+        This method generates contour lines and, optionally, filled contours
+        or hyighlighted regions. It returns a dictionary containing the plot objects and
+        data for further use (e.g., 3D stacking).
+
+        Parameters: 
+        X: 2D array of x-coordinates.
+        Y: 2D array of y-coordinates.
+        Z: 2D array of z-values.
+        contour_levels: The levels for the contourlines.
+            can accept int = number of contour lines , 
+            or specific normalization (matplotlib.colors.Normalize object)
+        ax: Optional matplotlib Axes object to plot on.
+        x_label: Optional label for the x-axis.
+        y_label: Optional label for the y-axis. 
+        tiltle: Optional title for the plot. 
+        norm : Optional normalization object for the colormap.
+        colorbar_labels: Optional dictionary of labels for the colorbar. 
+        individual_colorbars: A boolean flag to determine whether to add individual colorbars
+                                or not.
+        kwargs: Additional keyword arguments to override PlotConfig settings.
+
+        Returns: 
+            A dictionary containing the figure, axes, and contour objects.
+        
+        Raises: 
+            ContourPlotError: If both contour_filled and highlight flags are set.
+
         """
         local_config = self._apply_config_override(kwargs)
         created_fig = False
