@@ -108,8 +108,8 @@ class ContourPlotter:
         Initialize the ContourPlotter with a given configuration.
 
         Parameters:
-        config: An optional PlotConfig object to customize plot settings.
-                       If None, a default configuration is used.
+            config: An optional PlotConfig object to customize plot settings.
+                    If None, a default configuration is used.
         """
         self.config = config or PlotConfig()
         self._validate_configue()
@@ -118,8 +118,8 @@ class ContourPlotter:
         """
         Validate configuration parameters to ensure they are within valid ranges.
         Raises:
-        ContourPlotError: If percentile_threshold or filled_alpha are out
-          of range.
+            ContourPlotError: If percentile_threshold or filled_alpha are out
+            of range.
         """
         if (
             self.config.percentile_threshold < 0
@@ -175,17 +175,17 @@ class ContourPlotter:
         Interpolation is performed if specified in the configuration.
 
         Paramters:
-        df: The pandas DataFrame containing the data.
-        x_col: The column name for x-coordiantes.
-        y_col: The column name for y_coordinates.
-        z_col: The column name for z_coordinates.
-        config: A plotConfig object specifying plot settings.
+            df: The pandas DataFrame containing the data.
+            x_col: The column name for x-coordiantes.
+            y_col: The column name for y_coordinates.
+            z_col: The column name for z_coordinates.
+            config: A plotConfig object specifying plot settings.
 
         Returns: 
-        A tuple of three Numpy arrays (X, y, Z) representing the gridded data.
+            A tuple of three Numpy arrays (X, y, Z) representing the gridded data.
 
         Raises:
-        ContourPlotError: If the grid data preparation fails.
+            ContourPlotError: If the grid data preparation fails.
 
         """
         try:
@@ -218,10 +218,10 @@ class ContourPlotter:
         config.
 
         Parameters:
-        Override a dictionary of config attributes to override.
+            Override a dictionary of config attributes to override.
 
         Returns:
-        A new PlotConfig object with the applied overrides.
+            A new PlotConfig object with the applied overrides.
 
         """
         config_dict = self.config.__dict__.copy()
@@ -239,10 +239,10 @@ class ContourPlotter:
         Configures axis labels, ticks, and the title for a given subplot.
 
         Parameters:
-        ax: The matplotlib Axes object to configure.
-        x_label: The label for the x-axis.
-        y_label: The label for the y-axis.
-        title: The title of the subplot.
+            ax: The matplotlib Axes object to configure.
+            x_label: The label for the x-axis.
+            y_label: The label for the y-axis.
+            title: The title of the subplot.
         
         """
         if x_label:
@@ -263,17 +263,17 @@ class ContourPlotter:
         and creates a single colorbar that applies to all subplots.
 
         Parameters:
-        fig: The matplotlib Figure object
-        axes: A list of matplotlib Axes objects.
-        results: A list of dictionaries containing plot results for each subplot.
-        norm: The normalization object for the color scale.
-        colorbar_labels_set: Optional dictionary of labels for the colorbar ticks.
+            fig: The matplotlib Figure object
+            axes: A list of matplotlib Axes objects.
+            results: A list of dictionaries containing plot results for each subplot.
+            norm: The normalization object for the color scale.
+            colorbar_labels_set: Optional dictionary of labels for the colorbar ticks.
 
         Raises:
-        ContourPlotError: If no mappable contour object is found.
+            ContourPlotError: If no mappable contour object is found.
 
         Returns:
-        The created matplotlib Colorbar object.
+            The created matplotlib Colorbar object.
         """
         mappable = None
         for res in results:
@@ -325,16 +325,16 @@ class ContourPlotter:
         highlight function based on the configuration.
 
         Params:
-        ax: The matplotlib Axes object for plotting.
-        X: The 2D array of x-coordinates.
-        Y: The 2D array of y-coordinates.
-        Z: The 2D array of z-values.
-        levels: The conotur levels.
-        config: The PlotConfig object.
-        norm: The normalization object.
+            ax: The matplotlib Axes object for plotting.
+            X: The 2D array of x-coordinates.
+            Y: The 2D array of y-coordinates.
+            Z: The 2D array of z-values.
+            levels: The conotur levels.
+            config: The PlotConfig object.
+            norm: The normalization object.
 
         Returns:
-        The matplotlib contourf or highlight object.
+            The matplotlib contourf or highlight object.
         """
         if config.highlight:
             return highlight_region(
@@ -361,9 +361,9 @@ class ContourPlotter:
         Add inline labels to contour lines for better readability.
         
         Params:
-        ax: The matplotlib Axes object.
-        contour_lines: The contour lines object returned by ax.contour()
-        colorbar_labels: Optional dictionary of labels for the contour lines.
+            ax: The matplotlib Axes object.
+            contour_lines: The contour lines object returned by ax.contour()
+            colorbar_labels: Optional dictionary of labels for the contour lines.
         """
         if colorbar_labels:
             ax.clabel(
@@ -391,13 +391,13 @@ class ContourPlotter:
         Adds a colorbar to a single plot.
         
         Parameters:
-        fig: The matplotlib Figure object.
-        ax: The matplotlib Axes object.
-        contour_filled: The filled contour object.
-        colorbar_labels: Optional dictionary of labels for the colorbar ticks.
+            fig: The matplotlib Figure object.
+            ax: The matplotlib Axes object.
+            contour_filled: The filled contour object.
+            colorbar_labels: Optional dictionary of labels for the colorbar ticks.
 
         Returns:
-        The created matplotlib Colorbar object.
+        T   he created matplotlib Colorbar object.
 
         """
         colorbar = fig.colorbar(contour_filled, ax=ax)
@@ -430,21 +430,21 @@ class ContourPlotter:
         data for further use (e.g., 3D stacking).
 
         Parameters: 
-        X: 2D array of x-coordinates.
-        Y: 2D array of y-coordinates.
-        Z: 2D array of z-values.
-        contour_levels: The levels for the contourlines.
-            can accept int = number of contour lines , 
-            or specific normalization (matplotlib.colors.Normalize object)
-        ax: Optional matplotlib Axes object to plot on.
-        x_label: Optional label for the x-axis.
-        y_label: Optional label for the y-axis. 
-        tiltle: Optional title for the plot. 
-        norm : Optional normalization object for the colormap.
-        colorbar_labels: Optional dictionary of labels for the colorbar. 
-        individual_colorbars: A boolean flag to determine whether to add individual colorbars
-                                or not.
-        kwargs: Additional keyword arguments to override PlotConfig settings.
+            X: 2D array of x-coordinates.
+            Y: 2D array of y-coordinates.
+            Z: 2D array of z-values.
+            contour_levels: The levels for the contourlines.
+                can accept int = number of contour lines , 
+                or specific normalization (matplotlib.colors.Normalize object)
+            ax: Optional matplotlib Axes object to plot on.
+            x_label: Optional label for the x-axis.
+            y_label: Optional label for the y-axis. 
+            tiltle: Optional title for the plot. 
+            norm : Optional normalization object for the colormap.
+            colorbar_labels: Optional dictionary of labels for the colorbar. 
+            individual_colorbars: A boolean flag to determine whether to add individual colorbars
+                                    or not.
+            kwargs: Additional keyword arguments to override PlotConfig settings.
 
         Returns: 
             A dictionary containing the figure, axes, and contour objects.
@@ -521,17 +521,16 @@ class MultiContourPlotter(ContourPlotter):
         and manual levels) are not used together.
 
         Parameters:
-        adaptive_levels: Flag for generating levels automatically using 'log',
-                        'quantile', or 'linear' method
-        levels_arg : User-specified levels.
-        levels_step: User-specified level step. ( to have certain step size between
-                     contours levels)
-        highlight: Flag to highlight a specific region.
-        contour_filled: Flag to create filled contours with cmap colormap.
+            adaptive_levels: Flag for generating levels automatically using 'log',
+                            'quantile', or 'linear' method
+            levels_arg : User-specified levels.
+            levels_step: User-specified level step. ( to have certain step size between
+                        contours levels)
+            highlight: Flag to highlight a specific region.
+            contour_filled: Flag to create filled contours with cmap colormap.
         
         Raises:             
-        ContourPlotError:
-        If conflicting options are selected.
+            ContourPlotError:If conflicting options are selected.
         
         """
         # Constraint 1: adaptive_levels vs. manual levels 
@@ -571,14 +570,14 @@ class MultiContourPlotter(ContourPlotter):
         levels based on the full data range. 
 
         Parameters:
-        datasets: A list of pandas DataFrames.
-        x_col: The column name for x-coordinates.
-        y_col: The column name for y-coordinates.
-        z_col: The column name for z-values.
-        verbose: If True, prints status messages. 
+            datasets: A list of pandas DataFrames.
+            x_col: The column name for x-coordinates.
+            y_col: The column name for y-coordinates.
+            z_col: The column name for z-values.
+            verbose: If True, prints status messages. 
 
         Returns: 
-        A list of Numpy arrays for X, Y, and Z.
+            A list of Numpy arrays for X, Y, and Z.
         """
         X_all, Y_all, Z_all = [], [], []
         for i, df in enumerate(datasets):
@@ -604,11 +603,11 @@ class MultiContourPlotter(ContourPlotter):
         all gridded Z arrays. 
 
         Parameters:
-        Z_all: A list of gridded Z-value arrays.
-        verbose: If True, prints the calculated range. 
+            Z_all: A list of gridded Z-value arrays.
+            verbose: If True, prints the calculated range. 
 
         Returns:
-        A matplotlib Normalize object.
+            A matplotlib Normalize object.
         """
         all_values = np.concatenate([Z.ravel() for Z in Z_all if Z is not None])
         global_min, global_max = np.nanmin(all_values), np.nanmax(all_values)
@@ -627,13 +626,13 @@ class MultiContourPlotter(ContourPlotter):
         Calculates a robust normalization using percentiles to exclude outliers.
 
         Parameters:
-        Z_all: A list of gridded Z-value arrays.
-        vmin_percentile: The lower percentile for normalization.
-        vmax_percentile: The upper percentile for normalizaton.
-        verbose: If True, prints the calculated percentile range.
+            Z_all: A list of gridded Z-value arrays.
+            vmin_percentile: The lower percentile for normalization.
+            vmax_percentile: The upper percentile for normalizaton.
+            verbose: If True, prints the calculated percentile range.
 
         Returns:
-        A matplotlib Normalize object.
+            A matplotlib Normalize object.
         """
         all_values = np.concatenate([Z.ravel() for Z in Z_all if Z is not None])
         vmin = np.percentile(all_values, vmin_percentile)
@@ -656,13 +655,13 @@ class MultiContourPlotter(ContourPlotter):
         subplots.
 
         Parameters:
-        Z_all: Alist of gridded Z-value arrays. 
-        num_levels: The desired number of contour levels.
-        method: The method for creating levels ('quantile', 'log', 'linear')
-        verbose: If True, prints the generated levels.
+            Z_all: Alist of gridded Z-value arrays. 
+            num_levels: The desired number of contour levels.
+            method: The method for creating levels ('quantile', 'log', 'linear')
+            verbose: If True, prints the generated levels.
 
         Returns:
-        A Numpy array of the generated contour levels. 
+            A Numpy array of the generated contour levels. 
         """
         all_values = np.concatenate([Z.ravel() for Z in Z_all if Z is not None])
 
@@ -711,31 +710,30 @@ class MultiContourPlotter(ContourPlotter):
         contour levels.
 
         Parameters:
-        datasets: A single DataFrame or a list of DataFrames to plot.
-        x_col: The column name for x-coordinates.
-        y_col: The column name for y-coordinates.
-        z_col: The column name for z-values.
-        ncols: The number of columns in the subplot grid. 
-        shared_normalization: If True, uses a single color for all plots.
-        robust_normalization: If True, uses percentiles to ignore outliers.
-        adaptive_levels:If True, generates contour levels automatically. 
-        level_method: The method of adaptive levels ('quantile', 'linear', 'log')
-        titles: Optional list of titles for each subplot.
-        x_labels: Optional list of x-axis labels.
-        y_labels: Optional list of y-axis labels.
-        colorbar_labels_set : Optional list of dictionaries for colorbar labels.
-        show: If True, displays the plot.
-        savepath: Optional path to save the figure.
-        verbose: If True, prints progress messages. 
-        kwargs: Additional keyword arguments to pass to plot_single_contour 
+            datasets: A single DataFrame or a list of DataFrames to plot.
+            x_col: The column name for x-coordinates.
+            y_col: The column name for y-coordinates.
+            z_col: The column name for z-values.
+            ncols: The number of columns in the subplot grid. 
+            shared_normalization: If True, uses a single color for all plots.
+            robust_normalization: If True, uses percentiles to ignore outliers.
+            adaptive_levels:If True, generates contour levels automatically. 
+            level_method: The method of adaptive levels ('quantile', 'linear', 'log')
+            titles: Optional list of titles for each subplot.
+            x_labels: Optional list of x-axis labels.
+            y_labels: Optional list of y-axis labels.
+            colorbar_labels_set : Optional list of dictionaries for colorbar labels.
+            show: If True, displays the plot.
+            savepath: Optional path to save the figure.
+            verbose: If True, prints progress messages. 
+            kwargs: Additional keyword arguments to pass to plot_single_contour 
 
         Raises:
-        ContourPlotError:
-        If any of the input datasets are empty or if there are conflicts
-        inplotting options. 
+            ContourPlotError:If any of the input datasets are empty or if there
+            are conflicts inplotting options. 
 
         Returns:
-        A dictionary containing the figure, axes, plot results, and metadata.
+            A dictionary containing the figure, axes, plot results, and metadata.
 
         """
         if len(datasets) == 0: 
@@ -849,15 +847,44 @@ class MultiContourPlotter(ContourPlotter):
         }      
 # -----------------------------------------------------------------------
 class Contour3Dstacker:
-    """Specialized class for creating 3D stacked visualizations."""
+    """
+    A specialized class for creating 3D stacked visualizations of 2D contour plots
+
+    This class takes a collection of 2D contour plot results and renders 
+    them in a 3D space, allowing for the visualization of multi-layered data.
+    It provides options for line-based or filled contour rendering, custom Z
+    positions, and visual styling.
+    """
     # -------------------------------------------------------------------
     def __init__(self, config:Optional[PlotConfig] = None, verbose=False):
+        """
+        Initializes the Contour3Dstacker with a plotting configuration.
+
+        Parameters:
+            config: An optional PlotConfig object to customize plot settings.
+                    If None, a default configuration is used.
+            verbose: If True, prints the configuration upon initialization.
+        """
         self.config = config or PlotConfig()
         if verbose:
             print(f"Contour3Dstacker created with the following configuration:\n{self.config}")
     # -------------------------------------------------------------------
     def _calculate_spatial_extents(self, valid_contours: List[Tuple[int, Any]])-> Dict[str, float]:
-        """Calculate the spatial bounds of all contour data."""
+        """
+        Calculates the overall spatial bounds (min/max X and Y) of all contour data.
+
+        This is used to correctly set the aspect ratio and limits of the 3D plot.
+
+        Parameters: 
+            valid_contours: Alist of tuples, where each tuple contains an
+            index and a dictionary of contour plot results. 
+
+        Returs:
+            A dictonary containig the spatial bounds and ranges.
+
+        Raises:
+            ContourPlotError: If valid spatial extents cannot be determined. 
+        """
         x_min, x_max = float("inf"), -float("inf")
         y_min, y_max = float("inf"), -float("inf")
         
@@ -896,7 +923,24 @@ class Contour3Dstacker:
     def _calculate_z_positions(self, n_contours:int, z_positions:
                                Optional[List[float]],
                                 extents: Dict[str, float])->List[float]:
-        """Calculate Z positions for stacking contours."""
+        """
+        Calculate Z positions for stacking contours.
+        
+        If custom Z positions are not provided, they are auto-calculated based on
+        the spatial scale of the data and a configured gap factor. 
+
+        Parameters:
+            n_contours: The total number of contour layers to be stacked. 
+            z_positions: An optional list of custom Z positions for each layer. 
+            extents: A dictionary containing the spatial extents of the data. 
+
+        Returns: 
+            A list of Z-position floats for each contour layer.
+
+        Raises:
+            ContourPlotError: If the number of custom z_positions deos not 
+                              match the number of contours.
+        """
         if z_positions is not None:
             if len(z_positions) != n_contours:
                 raise ContourPlotError("Number of z_positions must match number of contours.")
@@ -908,7 +952,14 @@ class Contour3Dstacker:
     # -------------------------------------------------------------------
     def _setup_3d_view(self, ax: plt.Axes, extents:Dict[str, float], 
                        z_offsets:List[float]) -> None:
-        "Configure 3D axes view and propoerties."
+        """
+        Configure the 3D axes view, aspect ratio, and limits.
+        
+        Parameters:
+            ax: The matplotlib Axes3D object to confiugre.
+            extents: A dictionary containig the spatial extents of the data.
+            z_offsets: A list of Z-position offsets for the contour layers.
+        """
         ax.set_proj_type("ortho")
 
         # --- Set aspect ratio ------------------------------------------
@@ -928,7 +979,15 @@ class Contour3Dstacker:
     # -------------------------------------------------------------------
     def _render_line_contours(self, ax:plt.Axes, valid_contours:
                               List[Tuple[int, Any]], z_offsets: List[float], **kwargs) -> None:
-        """Render conoturs as lines in 3D."""
+        """
+        Render conotur lines in 3D by plotting each path at a given Z position.
+
+        Parameters:
+            ax: The matplotlib Axes3D object.
+            valid_contours: A list of contour plot result dictionaries.
+            Z_offsets: A list of Z-position offsets for each layer. 
+            kwargs: Additional keyword arguments.
+        """
         for (_, plot_data_dict), z_pos in zip(valid_contours, z_offsets):
             cs = plot_data_dict.get('contour_lines')
 
@@ -958,7 +1017,18 @@ class Contour3Dstacker:
         z_offsets: List[float], 
         **kwargs,
     ) -> None:
-        """Render filled contours in 3D by reusing the 2D filled collections directly."""
+        """
+        Render filled contours in 3D by using Poly3DCollection.
+        
+        This method reuses the filled contour paths from the 2D plots and
+        projects them into 3D space. 
+
+        Parameters:
+            ax: The matplotlib Axes3D object.
+            valid_contours: Alist of contour plot result dictionaries.
+            z_offsets: A list of Z-postion offsets for each layer. 
+            kwargs: Additional keyword arguments.
+        """
 
         for (_, plot_data_dict), z_pos in zip(valid_contours, z_offsets):
             cs_filled = plot_data_dict.get("contour_filled")
@@ -1007,7 +1077,14 @@ class Contour3Dstacker:
     # -------------------------------------------------------------------
     def _add_slice_boxes(self, ax:plt.Axes, extents: Dict[str, float],
                           z_offsets:List[float]) -> None:
-        """Add rectangular boxes to show slice boundaries."""
+        """
+        Add rectangular boxes to the 3D show the boundary of each slice.
+
+        Parameters:
+            ax: The matplotlib Axes3D object
+            extents: A dictionary containing the spatial extents of the data. 
+            z_offsets: A list of Z-position offsets for each contour layer.  
+        """
         for z_pos in z_offsets:
             ax.plot(
                 [extents["x_min"], extents["x_max"], extents["x_max"], extents["x_min"], extents["x_min"]],
@@ -1019,7 +1096,13 @@ class Contour3Dstacker:
             )
     # -------------------------------------------------------------------
     def _style_3d_plot(self, ax:plt.Axes, mode:str) -> None: 
-        """Apply final styling to 3D plot."""
+        """
+        Applies final styling to the 3D plot, including labels and title.
+
+        Parameters:
+            ax: The matplotlib Axes3D object.
+            mode: The rendering mode ('line', or 'filled').
+        """
         ax.set_xlabel("X Axis", fontsize=self.config.font_axis_label)
         ax.set_ylabel("Y Axis", fontsize=self.config.font_axis_label)
         ax.set_zlabel("Z layers", fontsize=self.config.font_axis_label)
@@ -1041,7 +1124,31 @@ class Contour3Dstacker:
             **kwargs
     ) -> Dict[str, Any]: 
         """
-        stack 2D contour plots in 3D space.
+        Stacks multiple 2D contour plots in a 3D visualization. 
+
+        This is the main public method for the Contour3Dstacker class. It 
+        creates a 3D figure, positions ech contour layer, and renders them
+        based on the specified mode.
+
+        Parameters:
+            contour_sets: A list of plot result dictionaries from a 2D plotter.
+            gridded_data: A dictionary containing the gridded X, Y, and Z data.
+            z-positions: Optional custom Z positions for each layer. 
+            figsize: Optional tuple for the figure size.
+            mode: The rendering mode ('line' or 'filled')
+            final_levels: The final contour levels used for the plots.
+            show_slice_boxes: If True, adds boxes to mark each slice.
+            show: If True, displays the plot. 
+            savepath: Optional path to save the figure. 
+            kwargs: Additional keyword arguments for rendering.
+
+        Returns: 
+            A dictionary containing the figure, axes, and plot metadata. 
+
+        Raises:
+            ContourPlotError: If no valid contour sets are provided or an unknown
+            rendering mode is specified. 
+
         """
         if not contour_sets:
             raise ContourPlotError("No contour sets provided.")
