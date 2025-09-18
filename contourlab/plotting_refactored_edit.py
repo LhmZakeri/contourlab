@@ -557,7 +557,7 @@ class Contour3Dstacker:
             return list(z_positions)
         
         # --- Auto-calculate based on spatial scale ---
-        z_gap = self.config.z_gap_factor * max(extents["x_ramge"], extents["y_range"])
+        z_gap = self.config.z_gap_factor * max(extents["x_range"], extents["y_range"])
         return [i * z_gap for i in range(n_contours)]
     
     def _setup_3d_view(self, ax: plt.Axes, extents:Dict[str, float], z_offsets:List[float]) -> None:
@@ -575,7 +575,7 @@ class Contour3Dstacker:
         margin_x = 0.02 * extents["x_range"]
         margin_y = 0.02 * extents["y_range"]
         ax.set_xlim(extents["x_min"] - margin_x, extents["x_max"] + margin_x)
-        ax.set_ylim(extents["y_min"] - margin_y, extents[y_max] + margin_y)
+        ax.set_ylim(extents["y_min"] - margin_y, extents["y_max"] + margin_y)
 
     def _render_line_contours(self, ax:plt.Axes, valid_contours: List[
         Tuple[int, Any]], z_offsets: List[float]) -> None:
@@ -588,9 +588,9 @@ class Contour3Dstacker:
                 edge_colors = coll.get_edgecolor()
                 color = edge_colors[0] if len(edge_colors) > 0 else 'k'
 
-                for path in coll.get_path():
+                for path in coll.get_paths():
                     vertices = path.vertices 
-                    if vertices.shape(0) < 2:
+                    if vertices.shape[0] < 2:
                         continue
 
                     x, y = vertices[:, 0], vertices[:, 1]

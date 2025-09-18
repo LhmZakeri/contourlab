@@ -7,6 +7,8 @@ import numpy as np
 from scipy.interpolate import griddata
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
+import matplotlib.cm as cm
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 from utils import highlight_region
 
@@ -47,7 +49,43 @@ class PlotConfig:
     view_azimuth: int = -60
     z_gap_factor: float = 0.15
     fill_alpha: float = 0.6
-
+    # -------------------------------------------------------------------
+    def __str__(self) -> str:
+        """
+        Provides a well-formatted string representation of the configuration.
+        """
+        config_str =(
+            f"--- Plot Configuration ---------\n"
+            f"----[Figure Setting]------------\n"
+            f"  -Figure Size:       {self.figsize}\n"
+            f"  - DPI:              {self.dpi}\n"
+            f"----[font Setting]--------------\n"
+            f"  - Axis Label:       {self.font_axis_label}\n"
+            f"  - Ticks:            {self.font_tick}\n"
+            f"  - Annotations:      {self.font_annotation}\n"
+            f"  - Title:            {self.font_title}\n"
+            f"  - Colorbar:         {self.font_colorbar}\n"
+            f"----[Contour Setting]-----------\n"
+            f"  - Levels:           {self.levels}\n"
+            f"  - Colormap:         {self.cmap}\n"
+            f"  - Line Colors:      {self.line_colors}\n"
+            f"  - line Widths:      {self.line_widths}\n"
+            f"----[Behavior Flags]------------\n"
+            f"  - Interpolate:      {self.interpolate}\n"
+            f"  - Highlight:        {self.highlight}\n"
+            f"  - Annotate:         {self.annotate}\n"
+            f"  - Add Colorbar:     {self.add_colorbar}\n"
+            f"  - Contour Filled:   {self.contour_filled}\n"
+            f"----[Highlighting Settings]-----\n"
+            f"  - Threshold:        {self.percentile_threshold}%\n"
+            f"----[3D Settings]---------------\n"
+            f"  - View Elevation:   {self.view_elevation}\n"
+            f"  - View Azimuth:     {self.view_azimuth}\n"
+            f"  - Z_Gap Factor:     {self.z_gap_factor}\n"
+            f"  - Fill Alpha:       {self.fill_alpha}\n"
+            f"--------------------------------\n"
+        )
+        return config_str
 # -----------------------------------------------------------------------
 class ContourPlotError(Exception):
     """Custom exception for ccontour plotting errors."""
@@ -542,8 +580,255 @@ class MultiContourPlotter(ContourPlotter):
             "axes": axes[:nplots],
             "results": results,
             "colorbar": colorbar,
-            "shared_norm": shared_norm
+            "shared_norm": shared_norm,
+            "gridded_data":{
+                "X_all": X_all,
+                "Y_all": Y_all,
+                "Z_all": Z_all,
+            }, 
+            "final_levels": final_levels,
         }      
+# -----------------------------------------------------------------------
+class Contour3Dstacker:
+    """Specialized class for creating 3D stacked visualizations."""
+    # -------------------------------------------------------------------
+    def __init__(self, config:Optional[PlotConfig] = None, verbose=False):
+        self.config = config or PlotConfig()
+        if verbose:
+            print(f"Contour3Dstacker created with the following configuration:\n{self.config}")
+    # -------------------------------------------------------------------
+    def _calculate_spatial_extents(self, valid_contours: List[Tuple[int, Any]])-> Dict[str, float]:
+        """Calculate the spatial bounds of all contour data."""
+        x_min, x_max = float("inf"), -float("inf")
+        y_min, y_max = float("inf"), -float("inf")
+        
+        for _, plot_data_dict in valid_contours:
+            cs = plot_data_dict.get("contour_lines")
+            if cs is None:
+                cs = plot_data_dict.get("contour_filled")
+            # If no contour data was found, skip this plot
+            if cs is None:
+                continue
+
+            if not hasattr(cs, "collections") or not cs.collections:
+                continue
+    # --- Skip in valid paths in countours ----------------------------    
+            for coll in cs.collections:
+                for path in coll.get_paths():
+                    vertices = path.vertices
+                    if vertices.size == 0 or vertices.shape[0] < 2:
+                        continue    
+
+                    x_min = min(x_min, vertices[:, 0].min())
+                    x_max = max(x_max, vertices[:, 0].max())
+                    y_min = min(y_min, vertices[:, 1].min())
+                    y_max = max(y_max, vertices[:, 1].max())
+
+        # The final checks and return statement are now outside the loop
+        if not all(np.isfinite([x_min, x_max, y_min, y_max])):
+            raise ContourPlotError("Could not determine valid spatial extents")
+        return{
+            "x_min": x_min, "x_max": x_max,
+            "y_min": y_min, "y_max": y_max,
+            "x_range": x_max - x_min, 
+            "y_range": y_max - y_min, 
+        }
+    # -------------------------------------------------------------------
+    def _calculate_z_positions(self, n_contours:int, z_positions:
+                               Optional[List[float]],
+                                extents: Dict[str, float])->List[float]:
+        """Calculate Z positions for stacking contours."""
+        if z_positions is not None:
+            if len(z_positions) != n_contours:
+                raise ContourPlotError("Number of z_positions must match number of contours.")
+            return list(z_positions)
+            
+        # --- Auro-calculate based on spatial scale ---------------------
+        z_gap = self.config.z_gap_factor* max(extents["x_range"], extents["y_range"])
+        return[i*z_gap for i in range(n_contours)]
+    # -------------------------------------------------------------------
+    def _setup_3d_view(self, ax: plt.Axes, extents:Dict[str, float], 
+                       z_offsets:List[float]) -> None:
+        "Configure 3D axes view and propoerties."
+        ax.set_proj_type("ortho")
+
+        # --- Set aspect ratio ------------------------------------------
+        z_range =  max(z_offsets) - min(z_offsets) if len(z_offsets) > 1 else 1.0
+        # (x_aspect_ratio, y_aspect_ratio, z_aspect_ratio)
+        ax.set_box_aspect((extents["x_range"], extents["y_range"], max(z_range, 1.0)))
+
+        # --- Set view angle --------------------------------------------
+        ax.view_init(elev= self.config.view_elevation, azim=self.config.view_azimuth)
+
+        # --- Set limits with margins -----------------------------------
+        margin_x = 0.02 * extents["x_range"]
+        margin_y = 0.02 * extents["y_range"]
+        ax.set_xlim(extents["x_min"] - margin_x, extents["x_max"] + margin_x)
+        ax.set_ylim(extents["y_min"] - margin_y, extents["y_max"] + margin_y)
+
+    # -------------------------------------------------------------------
+    def _render_line_contours(self, ax:plt.Axes, valid_contours:
+                              List[Tuple[int, Any]], z_offsets: List[float], **kwargs) -> None:
+        """Render conoturs as lines in 3D."""
+        for (_, plot_data_dict), z_pos in zip(valid_contours, z_offsets):
+            cs = plot_data_dict.get('contour_lines')
+
+            if cs is None:
+                continue
+
+            if not hasattr(cs, 'collections'):
+                continue
+
+            for coll in cs.collections:
+                edge_colors = coll.get_edgecolor()
+                color = edge_colors[0] if len(edge_colors) > 0 else 'k'
+
+                for path in coll.get_paths():
+                    vertices = path.vertices
+                    if vertices.shape[0] < 2:
+                            continue
+                    
+                    x, y = vertices[:, 0], vertices[:, 1]
+                    z = np.full_like(x, z_pos, dtype=float)
+                    ax.plot(x, y, z, color=color, linewidth=self.config.line_widths)
+    # -------------------------------------------------------------------
+    def _render_filled_contours(
+        self, 
+        ax: plt.Axes, 
+        valid_contours: List[Tuple[int, Any]], 
+        z_offsets: List[float], 
+        **kwargs,
+    ) -> None:
+        """Render filled contours in 3D by reusing the 2D filled collections directly."""
+
+        for (_, plot_data_dict), z_pos in zip(valid_contours, z_offsets):
+            cs_filled = plot_data_dict.get("contour_filled")
+            cs_lines = plot_data_dict.get("contour_lines")
+
+            if cs_filled is None:
+                continue
+            if not hasattr(cs_filled, "collections") or not cs_filled.collections:
+                continue
+
+            for coll in cs_filled.collections:
+                facecolor = coll.get_facecolor()
+                if len(facecolor) == 0:
+                    continue
+                color = facecolor[0]
+
+                for path in coll.get_paths():
+                    vertices = path.vertices
+                    if len(vertices) < 3:  # must have area
+                        continue
+                    x, y = vertices[:, 0], vertices[:, 1]
+                    z = np.full_like(x, z_pos)
+
+                    verts = [list(zip(x, y, z))]
+                    poly = Poly3DCollection(
+                        verts,
+                        facecolor=color,
+                        alpha=self.config.fill_alpha,
+                        linewidths=0
+                    )
+                    ax.add_collection3d(poly)
+
+            # Colored contour outline color 
+            if cs_lines is not None and hasattr(cs_lines, "collections"):
+                for coll in cs_lines.collections:
+                    for path in coll.get_paths():
+                        v = path.vertices 
+                        if len(v) < 2:
+                            continue
+                        x, y = v[:, 0], v[:, 1]
+                        z = np.full_like(x, z_pos+ 1e-3)
+
+                        ax.plot(x, y, z, color = self.config.line_colors,
+                                 linewidth=self.config.line_widths)
+
+    # -------------------------------------------------------------------
+    def _add_slice_boxes(self, ax:plt.Axes, extents: Dict[str, float],
+                          z_offsets:List[float]) -> None:
+        """Add rectangular boxes to show slice boundaries."""
+        for z_pos in z_offsets:
+            ax.plot(
+                [extents["x_min"], extents["x_max"], extents["x_max"], extents["x_min"], extents["x_min"]],
+                [extents["y_min"], extents["y_min"], extents["y_max"], extents["y_max"], extents["y_min"]], 
+                [z_pos]*5, 
+                color = "k", 
+                linewidth = 1, 
+                alpha = 0.7,
+            )
+    # -------------------------------------------------------------------
+    def _style_3d_plot(self, ax:plt.Axes, mode:str) -> None: 
+        """Apply final styling to 3D plot."""
+        ax.set_xlabel("X Axis", fontsize=self.config.font_axis_label)
+        ax.set_ylabel("Y Axis", fontsize=self.config.font_axis_label)
+        ax.set_zlabel("Z layers", fontsize=self.config.font_axis_label)
+        ax.set_title(f"3D stacked contours ({mode} mode)", fontsize=self.config.font_title)
+        plt.tight_layout()
+
+    # -------------------------------------------------------------------
+    def stack_contours(
+            self, 
+            contour_sets: List[Any],
+            gridded_data: Dict[str, List[np.ndarray]],            
+            z_positions: Optional[List[float]] = None,
+            figsize: Optional[Tuple[float, float]] = None,
+            mode: str = "line",
+            final_levels: Optional[List[float]] = None,
+            show_slice_boxes : bool = True, 
+            show: bool = False,
+            savepath: Optional[str] = None,
+            **kwargs
+    ) -> Dict[str, Any]: 
+        """
+        stack 2D contour plots in 3D space.
+        """
+        if not contour_sets:
+            raise ContourPlotError("No contour sets provided.")
+        
+        # --- Filter out None contour sets ------------------------------
+        valid_contours = [(i, cs) for i, cs in enumerate(contour_sets) if cs is not None]
+        if not valid_contours:
+            raise ContourPlotError("No valid contour sets found")
+        
+        # --- Setup figure ----------------------------------------------
+        figsize = figsize or (10, 8)
+        fig = plt.figure(figsize=figsize, dpi=self.config.dpi)
+        ax = fig.add_subplot(111, projection="3d")
+
+        # --- Calculate spatial extents and Z positions -----------------
+        extents = self._calculate_spatial_extents(valid_contours)
+        z_offsets = self._calculate_z_positions(len(valid_contours), z_positions, extents)
+
+        # --- Configure 3D view -----------------------------------------
+        self._setup_3d_view(ax, extents, z_offsets)
+
+        # --- Render contours based on mode -----------------------------
+        if mode == "line":
+            self._render_line_contours(ax, valid_contours, z_offsets, **kwargs)
+        elif mode == "filled":
+            self._render_filled_contours(ax, valid_contours, z_offsets)
+
+        else:
+            raise ContourPlotError(f"Unknown rendering mode: {mode}")
+        # --- Add slice boxes if requested ------------------------------
+        if show_slice_boxes:
+            self._add_slice_boxes(ax, extents, z_offsets)
+        # --- Final Styling ---------------------------------------------
+        self._style_3d_plot(ax, mode)
+        if savepath:
+            fig.savefig(savepath, dpi=self.config.dpi, bbox_inches="tight")
+        if show:
+            plt.show()
+        
+        return{
+            "figure": fig, 
+            "axes": ax, 
+            "z_positions": z_offsets,
+            "extents": extents,
+            "mode": mode
+        }
 # =======================================================================
 if __name__ == "__main__":
     # -------------------------------------------------------------------
@@ -565,18 +850,18 @@ if __name__ == "__main__":
         line_colors = "k",
         line_widths = 1.0,
         # --- Behavior flags ---
-        #interpolate= True,
-        #highlight = False,
-        #annotate= True,
-        #add_colorbar= False,
-        #contour_filled = False,
+        interpolate= True,
+        highlight = False,
+        annotate= True,
+        add_colorbar= False,
+        contour_filled = False,
         # --- Highlighting ---
-        #percentile_threshold= 80.0,
+        percentile_threshold= 80.0,
         # --- 3D setting ---
         view_elevation = 22,
         view_azimuth = -60,
         z_gap_factor = 0.15,
-        fill_alpha = 0.6,
+        fill_alpha = 0.7,
     )
 
     datadirs = [
@@ -623,7 +908,7 @@ if __name__ == "__main__":
         label_list.append(colorbar_labels)
     
     mcp = MultiContourPlotter()
-    mcp.plot_multiple_contours(
+    results = mcp.plot_multiple_contours(
         datasets=dataset,
         x_col = "aniso_phase",
         y_col = "wavelength",
@@ -631,12 +916,13 @@ if __name__ == "__main__":
         ncols = 3,
         interpolate=True, 
 
-        shared_normalization= False,
+        shared_normalization= True,
         robust_normalization = False, # shared_normalization should be True also 
         adaptive_levels = False, 
         level_method = 'quantile', #'Log'/'linear'/'quantile',
 
-        levels=levelsset,#levelsset / 5, 
+        #levels=levelsset,#levelsset / 5, 
+        levels = 10,
         #levels_step = 1,
 
         titles=["Sigma (4, 2)", "Sigma (5, 5)", "Sigma (6, 2)", "Sigma (8, 4)", "Sigma (9, 3)"],        
@@ -644,12 +930,27 @@ if __name__ == "__main__":
         y_labels=["Mean of Success Rate", None, None, "Mean of Success Rate", None], 
 
         annotate=False, 
-        highlight = True,
+        highlight = False,
         percentile_threshold=60,        
-        contour_filled = False, 
+        contour_filled = True, 
 
         #colorbar_labels_set=label_list,  
         add_colorbar=True, 
         show=True,
         verbose = False,  
     )
+    c3d = Contour3Dstacker(plot_config, verbose=False)
+    c3d.stack_contours(results['results'],
+                    #z_positions=np.arange(5),
+                    mode= "filled",#'line',"filled"
+                    show=True, 
+                    figsize=(12, 10), 
+                    show_slice_boxes=True,
+                    cmap = "Blues",
+                    shared_norm = results['shared_norm'],
+                    gridded_data=results["gridded_data"], 
+                    show_line = True, 
+                    final_levels=results["final_levels"],
+                    line_colors = 'k',
+                    )
+
