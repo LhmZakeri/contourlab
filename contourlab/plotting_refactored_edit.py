@@ -504,11 +504,36 @@ class ContourPlotter:
         return results
 # -----------------------------------------------------------------------
 class MultiContourPlotter(ContourPlotter):    
-    """ Extended plotter for multiple contour subplots."""
+    """ 
+    An extension of ContourPlotter for creating multiple contour subplots. 
+
+    This class enables the creation of side-by-side contour plots with advanced
+    features like shared normalization and adaptive level generation across 
+    multiple datasets. 
+    """
     # -------------------------------------------------------------------
     def _validate_multi_plot_options(self, adaptive_levels, levels_arg,
                                       levels_step, highlight, contour_filled):
-        """Validate options specific to multi-contour plots."""
+        """
+        Validates configuration options specific to multi-contour plots.
+
+        This ensures that mutually exclusive options (e.g., adaptive levels
+        and manual levels) are not used together.
+
+        Parameters:
+        adaptive_levels: Flag for generating levels automatically using 'log',
+                        'quantile', or 'linear' method
+        levels_arg : User-specified levels.
+        levels_step: User-specified level step. ( to have certain step size between
+                     contours levels)
+        highlight: Flag to highlight a specific region.
+        contour_filled: Flag to create filled contours with cmap colormap.
+        
+        Raises:             
+        ContourPlotError:
+        If conflicting options are selected.
+        
+        """
         # Constraint 1: adaptive_levels vs. manual levels 
         if adaptive_levels and (levels_arg is not None or levels_step is not None):
             raise ContourPlotError(
@@ -540,8 +565,20 @@ class MultiContourPlotter(ContourPlotter):
         verbose = False,
     ) -> List[np.ndarray]:
         """
-        Run all datasets through _prepare_data_grid and collect Z arrays.
-        This ensures normalization and level selection use gridded values.
+        Converts a list of DataFrame into a list of gridded Z-value arrays.
+
+        This step is neccessary for calculting shared normalization and adaptive
+        levels based on the full data range. 
+
+        Parameters:
+        datasets: A list of pandas DataFrames.
+        x_col: The column name for x-coordinates.
+        y_col: The column name for y-coordinates.
+        z_col: The column name for z-values.
+        verbose: If True, prints status messages. 
+
+        Returns: 
+        A list of Numpy arrays for X, Y, and Z.
         """
         X_all, Y_all, Z_all = [], [], []
         for i, df in enumerate(datasets):
@@ -560,7 +597,19 @@ class MultiContourPlotter(ContourPlotter):
         Z_all: List[np.ndarray],
         verbose = False,
     )-> Normalize:
-        """Calculate shared normalization across all gridded Z arrays."""
+        """
+        Calculate a shared normalization object for all plots.
+
+        The min and max values are determined from the combined range of 
+        all gridded Z arrays. 
+
+        Parameters:
+        Z_all: A list of gridded Z-value arrays.
+        verbose: If True, prints the calculated range. 
+
+        Returns:
+        A matplotlib Normalize object.
+        """
         all_values = np.concatenate([Z.ravel() for Z in Z_all if Z is not None])
         global_min, global_max = np.nanmin(all_values), np.nanmax(all_values)
         if verbose:
@@ -574,7 +623,18 @@ class MultiContourPlotter(ContourPlotter):
         vmax_percentile: float = 98.0,
         verbose: bool = False,
     ) -> Normalize: 
-        """Robust normalization from gridded Z values using percentiles."""
+        """
+        Calculates a robust normalization using percentiles to exclude outliers.
+
+        Parameters:
+        Z_all: A list of gridded Z-value arrays.
+        vmin_percentile: The lower percentile for normalization.
+        vmax_percentile: The upper percentile for normalizaton.
+        verbose: If True, prints the calculated percentile range.
+
+        Returns:
+        A matplotlib Normalize object.
+        """
         all_values = np.concatenate([Z.ravel() for Z in Z_all if Z is not None])
         vmin = np.percentile(all_values, vmin_percentile)
         vmax = np.percentile(all_values, vmax_percentile)
@@ -589,7 +649,21 @@ class MultiContourPlotter(ContourPlotter):
         method: str = 'quantile', 
         versbose: bool = False,
     ) -> np.ndarray:
-        """Create levels from combined gridded Z arrays."""
+        """
+        Creates a uniform set of contour levels from the combined data. 
+
+        This allows for consistent coloring amd contour lines across all 
+        subplots.
+
+        Parameters:
+        Z_all: Alist of gridded Z-value arrays. 
+        num_levels: The desired number of contour levels.
+        method: The method for creating levels ('quantile', 'log', 'linear')
+        verbose: If True, prints the generated levels.
+
+        Returns:
+        A Numpy array of the generated contour levels. 
+        """
         all_values = np.concatenate([Z.ravel() for Z in Z_all if Z is not None])
 
         if method == 'quantile': 
@@ -629,6 +703,41 @@ class MultiContourPlotter(ContourPlotter):
         verbose = False,
         **kwargs,
     )-> Dict[str, Any]:
+        """
+        Creates a multi-panel grid of contour plots from a list of datasets.
+
+        This method coordinates the plotting of multiple datasets in a single 
+        figure, with options for shared color scales and dynamically generated
+        contour levels.
+
+        Parameters:
+        datasets: A single DataFrame or a list of DataFrames to plot.
+        x_col: The column name for x-coordinates.
+        y_col: The column name for y-coordinates.
+        z_col: The column name for z-values.
+        ncols: The number of columns in the subplot grid. 
+        shared_normalization: If True, uses a single color for all plots.
+        robust_normalization: If True, uses percentiles to ignore outliers.
+        adaptive_levels:If True, generates contour levels automatically. 
+        level_method: The method of adaptive levels ('quantile', 'linear', 'log')
+        titles: Optional list of titles for each subplot.
+        x_labels: Optional list of x-axis labels.
+        y_labels: Optional list of y-axis labels.
+        colorbar_labels_set : Optional list of dictionaries for colorbar labels.
+        show: If True, displays the plot.
+        savepath: Optional path to save the figure.
+        verbose: If True, prints progress messages. 
+        kwargs: Additional keyword arguments to pass to plot_single_contour 
+
+        Raises:
+        ContourPlotError:
+        If any of the input datasets are empty or if there are conflicts
+        inplotting options. 
+
+        Returns:
+        A dictionary containing the figure, axes, plot results, and metadata.
+
+        """
         if len(datasets) == 0: 
             raise ContourPlotError("No dataset is provided.")
         for df in datasets:
