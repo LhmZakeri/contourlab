@@ -38,11 +38,11 @@ if __name__ == "__main__":
     )
 
     datadirs = [
-            "/home/elham/EikonalOptim/data/crn_table_sigma42.txt",
-            "/home/elham/EikonalOptim/data/crn_table_sigma51.txt",
-            "/home/elham/EikonalOptim/data/crn_table_sigma63.txt",
-            "/home/elham/EikonalOptim/data/crn_table_sigma82.txt",
-            "/home/elham/EikonalOptim/data/crn_table_sigma93.txt",
+            "./data/crn_table_sigma42.txt",
+            "./data/crn_table_sigma51.txt",
+            "./data/crn_table_sigma63.txt",
+            "./data/crn_table_sigma82.txt",
+            "./data/crn_table_sigma93.txt",
         ]
     
     dataset = []
