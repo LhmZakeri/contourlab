@@ -2,8 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from contourlab.plotting import plot_multiple_contours, stack_contours_in_z
-from contourlab.plotting_refactored_edit import PlotConfig, ContourPlotter, MultiContourPlotter, Contour3Dstacker
+from contourlab.plotting import *
 
 
 def make_x_shifted_normal(X, Y, shift):

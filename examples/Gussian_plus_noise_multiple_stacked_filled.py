@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from contourlab.plotting_refactored_edit import MultiContourPlotter, Contour3Dstacker, ContourPlotter, PlotConfig
+from contourlab.plotting import *
 
 if __name__ == "__main__":
     # --- Create a grid of (x, y) points ------------------------------------------
