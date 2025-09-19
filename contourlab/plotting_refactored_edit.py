@@ -9,8 +9,9 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 import matplotlib.cm as cm
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from scipy.ndimage import gaussian_filter
 
-from utils import highlight_region
+#from .utils import highlight_region
 
 # -----------------------------------------------------------------------
 @dataclass
@@ -194,6 +195,7 @@ class ContourPlotter:
             )
             X, Y = np.meshgrid(pivot_df.columns, pivot_df.index)
             Z = pivot_df.values
+
             if config.interpolate:
                 xi = np.linspace(X.min(), X.max(), 200)  # finer grid
                 yi = np.linspace(Y.min(), Y.max(), 200)
@@ -337,14 +339,14 @@ class ContourPlotter:
             The matplotlib contourf or highlight object.
         """
         if config.highlight:
-            return highlight_region(
+            return ContourPlotter.highlight_region(
                 ax, 
                 X, 
                 Y, 
                 Z, 
-                percent = config.percentile_threshold,
-                levels=levels,
-                cmap=config.cmap,
+                config.percentile_threshold,
+                levels,
+                config.cmap,
             )
         return ax.contourf(
             X, Y, Z, levels=levels, cmap=config.cmap, norm=norm, extend="both"
@@ -408,6 +410,28 @@ class ContourPlotter:
         
         colorbar.ax.tick_params(labelsize=self.config.font_colorbar)
         return colorbar
+    # -------------------------------------------------------------------
+
+    def highlight_region(
+        ax, X, Y, Z, percent: float, levels: int = 10, cmap: str = "Blues"
+    ):
+        """Highlight top values in Z"""
+        Zmin, Zmax = np.nanmin(Z), np.nanmax(Z)
+        threshold = np.nanpercentile(Z, percent)
+
+        if np.isscalar(levels):
+            n = max(int(levels), 2)
+            fill_levels = np.linspace(max(threshold, Zmin), Zmax, n)
+        else:
+            levels = np.asarray(levels)
+            fill_levels = levels[levels >= threshold]
+            if fill_levels.size < 2:
+                # Ensure have at least two levels for contourf
+                fill_levels = np.array([max(threshold, Zmin), Zmax])
+        # Mask values below threshold
+        Z_highlight = np.where(Z >= threshold, Z, Zmin - 1.0)
+        return ax.contourf(X, Y, Z_highlight, levels=fill_levels, cmap=cmap)
+
     # -------------------------------------------------------------------
     def plot_single_contour(
         self,
@@ -951,7 +975,7 @@ class Contour3Dstacker:
         return[i*z_gap for i in range(n_contours)]
     # -------------------------------------------------------------------
     def _setup_3d_view(self, ax: plt.Axes, extents:Dict[str, float], 
-                       z_offsets:List[float]) -> None:
+                       z_offsets:List[float], **kwargs) -> None:
         """
         Configure the 3D axes view, aspect ratio, and limits.
         
@@ -964,11 +988,14 @@ class Contour3Dstacker:
 
         # --- Set aspect ratio ------------------------------------------
         z_range =  max(z_offsets) - min(z_offsets) if len(z_offsets) > 1 else 1.0
+        
         # (x_aspect_ratio, y_aspect_ratio, z_aspect_ratio)
         ax.set_box_aspect((extents["x_range"], extents["y_range"], max(z_range, 1.0)))
 
         # --- Set view angle --------------------------------------------
-        ax.view_init(elev= self.config.view_elevation, azim=self.config.view_azimuth)
+        elev = self.config.view_elevation
+        azim = self.config.view_azimuth
+        ax.view_init(elev=elev, azim=azim)
 
         # --- Set limits with margins -----------------------------------
         margin_x = 0.02 * extents["x_range"]
@@ -1008,7 +1035,7 @@ class Contour3Dstacker:
                     
                     x, y = vertices[:, 0], vertices[:, 1]
                     z = np.full_like(x, z_pos, dtype=float)
-                    ax.plot(x, y, z, color=color, linewidth=self.config.line_widths)
+                    ax.plot(x, y, z, color=color, linewidth=self.config.line_widths, zorder=2)
     # -------------------------------------------------------------------
     def _render_filled_contours(
         self, 
@@ -1047,7 +1074,7 @@ class Contour3Dstacker:
 
                 for path in coll.get_paths():
                     vertices = path.vertices
-                    if len(vertices) < 3:  # must have area
+                    if len(vertices) < 3:  
                         continue
                     x, y = vertices[:, 0], vertices[:, 1]
                     z = np.full_like(x, z_pos)
@@ -1056,8 +1083,9 @@ class Contour3Dstacker:
                     poly = Poly3DCollection(
                         verts,
                         facecolor=color,
-                        alpha=self.config.fill_alpha,
-                        linewidths=0
+                        alpha=kwargs.get('fill_alpha'),
+                        linewidths=0,
+                        zorder=1 
                     )
                     ax.add_collection3d(poly)
 
@@ -1069,11 +1097,12 @@ class Contour3Dstacker:
                         if len(v) < 2:
                             continue
                         x, y = v[:, 0], v[:, 1]
-                        z = np.full_like(x, z_pos+ 1e-3)
+                        z = np.full_like(x, z_pos + 1e-3)
 
-                        ax.plot(x, y, z, color = self.config.line_colors,
-                                 linewidth=self.config.line_widths)
-
+                        ax.plot(x, y, z, 
+                                color=kwargs.get('line_colors'),
+                                linewidth=kwargs.get('line_widths'),
+                                zorder=2) 
     # -------------------------------------------------------------------
     def _add_slice_boxes(self, ax:plt.Axes, extents: Dict[str, float],
                           z_offsets:List[float]) -> None:
@@ -1095,7 +1124,7 @@ class Contour3Dstacker:
                 alpha = 0.7,
             )
     # -------------------------------------------------------------------
-    def _style_3d_plot(self, ax:plt.Axes, mode:str) -> None: 
+    def _style_3d_plot(self, ax:plt.Axes, mode:str, **kwargs) -> None: 
         """
         Applies final styling to the 3D plot, including labels and title.
 
@@ -1103,21 +1132,20 @@ class Contour3Dstacker:
             ax: The matplotlib Axes3D object.
             mode: The rendering mode ('line', or 'filled').
         """
-        ax.set_xlabel("X Axis", fontsize=self.config.font_axis_label)
-        ax.set_ylabel("Y Axis", fontsize=self.config.font_axis_label)
-        ax.set_zlabel("Z layers", fontsize=self.config.font_axis_label)
-        ax.set_title(f"3D stacked contours ({mode} mode)", fontsize=self.config.font_title)
+        font = kwargs.get('font_axis_label')
+        ax.set_xlabel("X Axis", fontsize=font)
+        ax.set_ylabel("Y Axis", fontsize=font)
+        ax.set_zlabel("Z layers", fontsize=font)
+        ax.set_title(f"3D stacked contours ({mode} mode)", fontsize=kwargs.get('font_title'))
         plt.tight_layout()
 
     # -------------------------------------------------------------------
     def stack_contours(
             self, 
             contour_sets: List[Any],
-            gridded_data: Dict[str, List[np.ndarray]],            
             z_positions: Optional[List[float]] = None,
             figsize: Optional[Tuple[float, float]] = None,
             mode: str = "line",
-            final_levels: Optional[List[float]] = None,
             show_slice_boxes : bool = True, 
             show: bool = False,
             savepath: Optional[str] = None,
@@ -1132,11 +1160,9 @@ class Contour3Dstacker:
 
         Parameters:
             contour_sets: A list of plot result dictionaries from a 2D plotter.
-            gridded_data: A dictionary containing the gridded X, Y, and Z data.
             z-positions: Optional custom Z positions for each layer. 
             figsize: Optional tuple for the figure size.
             mode: The rendering mode ('line' or 'filled')
-            final_levels: The final contour levels used for the plots.
             show_slice_boxes: If True, adds boxes to mark each slice.
             show: If True, displays the plot. 
             savepath: Optional path to save the figure. 
@@ -1160,7 +1186,8 @@ class Contour3Dstacker:
         
         # --- Setup figure ----------------------------------------------
         figsize = figsize or (10, 8)
-        fig = plt.figure(figsize=figsize, dpi=self.config.dpi)
+        dpi = kwargs.get('dpi')
+        fig = plt.figure(figsize=figsize, dpi=dpi)
         ax = fig.add_subplot(111, projection="3d")
 
         # --- Calculate spatial extents and Z positions -----------------
@@ -1168,7 +1195,7 @@ class Contour3Dstacker:
         z_offsets = self._calculate_z_positions(len(valid_contours), z_positions, extents)
 
         # --- Configure 3D view -----------------------------------------
-        self._setup_3d_view(ax, extents, z_offsets)
+        self._setup_3d_view(ax, extents, z_offsets, **kwargs)
 
         # --- Render contours based on mode -----------------------------
         if mode == "line":
@@ -1182,7 +1209,7 @@ class Contour3Dstacker:
         if show_slice_boxes:
             self._add_slice_boxes(ax, extents, z_offsets)
         # --- Final Styling ---------------------------------------------
-        self._style_3d_plot(ax, mode)
+        self._style_3d_plot(ax, mode, **kwargs)
         if savepath:
             fig.savefig(savepath, dpi=self.config.dpi, bbox_inches="tight")
         if show:
@@ -1195,128 +1222,4 @@ class Contour3Dstacker:
             "extents": extents,
             "mode": mode
         }
-# =======================================================================
-if __name__ == "__main__":
-    # -------------------------------------------------------------------
-    #  Adjust config setting  
-    # -------------------------------------------------------------------
-    plot_config = PlotConfig(
-        # --- Figure setting ---
-        figsize= (6, 5), 
-        dpi= 100,
-        # --- Font settings ---
-        font_axis_label = 12,
-        font_tick = 10,
-        font_annotation= 8,
-        font_title= 14,
-        font_colorbar = 10,
-        # --- Contour settings ---
-        levels = 10,            
-        cmap = "Blues", 
-        line_colors = "k",
-        line_widths = 1.0,
-        # --- Behavior flags ---
-        interpolate= True,
-        highlight = False,
-        annotate= True,
-        add_colorbar= False,
-        contour_filled = False,
-        # --- Highlighting ---
-        percentile_threshold= 80.0,
-        # --- 3D setting ---
-        view_elevation = 22,
-        view_azimuth = -60,
-        z_gap_factor = 0.15,
-        fill_alpha = 0.7,
-    )
-
-    datadirs = [
-            "/home/elham/EikonalOptim/data/crn_table_sigma42.txt",
-            "/home/elham/EikonalOptim/data/crn_table_sigma51.txt",
-            "/home/elham/EikonalOptim/data/crn_table_sigma63.txt",
-            "/home/elham/EikonalOptim/data/crn_table_sigma82.txt",
-            "/home/elham/EikonalOptim/data/crn_table_sigma93.txt",
-        ]
-    
-    dataset = []
-    levelsset = []
-    label_list = []
-    for datadir in datadirs:
-        data = pd.read_csv(datadir, sep="\s+")
-        dataset.append(data)
-        
-        cp = ContourPlotter()
-        _, _, Z= cp._prepare_data_grid(data, "aniso_phase", "wavelength", "simdur", config=plot_config)
-        Zmax = np.nanmax(Z)
-
-        levels = np.array(
-            [
-                Zmax * (0.97),
-                Zmax * (0.975),
-                Zmax * (0.98),
-                Zmax * (0.985), 
-                Zmax * (0.99),
-                Zmax * (0.995),
-                Zmax,
-            ],
-            dtype = float,            
-        )
-        levelsset.append(levels)
-        colorbar_labels = {
-            levels[6]: "Max",
-            levels[5]: "Max-0.5%",
-            levels[4]: "Max-1.0%",
-            levels[3]: "Max-1.5%",
-            levels[2]: "Max-2.0%",
-            levels[1]: "Max-2.5%",
-            levels[0]: "Max-3.0%",
-        }
-        label_list.append(colorbar_labels)
-    
-    mcp = MultiContourPlotter()
-    results = mcp.plot_multiple_contours(
-        datasets=dataset,
-        x_col = "aniso_phase",
-        y_col = "wavelength",
-        z_col = "simdur",
-        ncols = 3,
-        interpolate=True, 
-
-        shared_normalization= True,
-        robust_normalization = False, # shared_normalization should be True also 
-        adaptive_levels = False, 
-        level_method = 'quantile', #'Log'/'linear'/'quantile',
-
-        #levels=levelsset,#levelsset / 5, 
-        levels = 10,
-        #levels_step = 1,
-
-        titles=["Sigma (4, 2)", "Sigma (5, 5)", "Sigma (6, 2)", "Sigma (8, 4)", "Sigma (9, 3)"],        
-        #x_labels
-        y_labels=["Mean of Success Rate", None, None, "Mean of Success Rate", None], 
-
-        annotate=False, 
-        highlight = False,
-        percentile_threshold=60,        
-        contour_filled = True, 
-
-        #colorbar_labels_set=label_list,  
-        add_colorbar=True, 
-        show=True,
-        verbose = False,  
-    )
-    c3d = Contour3Dstacker(plot_config, verbose=False)
-    c3d.stack_contours(results['results'],
-                    #z_positions=np.arange(5),
-                    mode= "filled",#'line',"filled"
-                    show=True, 
-                    figsize=(12, 10), 
-                    show_slice_boxes=True,
-                    cmap = "Blues",
-                    shared_norm = results['shared_norm'],
-                    gridded_data=results["gridded_data"], 
-                    show_line = True, 
-                    final_levels=results["final_levels"],
-                    line_colors = 'k',
-                    )
 
