@@ -1,10 +1,7 @@
 import numpy as np 
 import pandas as pd
 
-from contourlab.plotting_refactored_edit import MultiContourPlotter
-from contourlab.plotting_refactored_edit import Contour3Dstacker
-from contourlab.plotting_refactored_edit import ContourPlotter
-from contourlab.plotting_refactored_edit import PlotConfig
+from contourlab import *
 
 if __name__ == "__main__":
     # -------------------------------------------------------------------
