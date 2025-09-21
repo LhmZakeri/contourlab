@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 
 from contourlab import *
-
 if __name__ == "__main__":
     # -------------------------------------------------------------------
     #  Adjust config setting  
