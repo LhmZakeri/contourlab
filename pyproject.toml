@@ -1,25 +1,34 @@
 [project]
 name = "contourlab"
-version = "0.1.0"
-description = "Contour plotting utilities"
-authors = [{ name="Elham", email="you@example.com" }]
+version = "0.0.1"
+description = "A python library for creating 2D contour plots with advanced features." 
+authors = [{ name="Elham Zakeri", email="lhmzakeri@gmail.com" }]
 license = "MIT"  # SPDX expression
 readme = "README.md"
-requires-python = ">=3.10"
-dependencies = ["numpy", "pandas", "matplotlib"]
-
-[options.entry_points]
-console_scripts =
-    contourlab = contourlab.cli:main
+requires-python = ">=3.9"
+classifiers = [
+	"Programming Language :: Python :: 3",
+	"License :: OSI Approved :: MIT License",
+	"Operating System :: OS Independent",
+]
+dependencies = [
+	"numpy",
+	"pandas",
+	"Scipy",
+	"matplotlib",
+	"mpl_toolkits",
+	"warnings",
+	"dataclasses",
+	"typing",
+]
 
 [build-system]
-requires = ["setuptools>=65.5.0", "wheel"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
-
-[tool.setuptools.packages.find]
-include = ["contourlab*"]
-exclude = ["data*"]
 
 [project.scripts]
 contourlab = "contourlab.cli:main"
 
+[project.urls]
+Homepage = "https://github.com/LhmZakeri/contourlab"
+Issues = "https://github.com/LhmZakeri/contourlab/issues"
