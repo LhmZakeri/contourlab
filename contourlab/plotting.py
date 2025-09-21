@@ -256,6 +256,27 @@ class ContourPlotter:
 
         ax.tick_params(axis="x", labelsize=self.config.font_tick)
         ax.tick_params(axis="y", labelsize=self.config.font_tick)
+        
+    # -------------------------------------------------------------------
+    def _highlight_region(
+        ax, X, Y, Z, percent: float, levels: int = 10, cmap: str = "Blues"
+    ):
+        """Highlight top values in Z"""
+        Zmin, Zmax = np.nanmin(Z), np.nanmax(Z)
+        threshold = np.nanpercentile(Z, percent)
+
+        if np.isscalar(levels):
+            n = max(int(levels), 2)
+            fill_levels = np.linspace(max(threshold, Zmin), Zmax, n)
+        else:
+            levels = np.asarray(levels)
+            fill_levels = levels[levels >= threshold]
+            if fill_levels.size < 2:
+                # Ensure have at least two levels for contourf
+                fill_levels = np.array([max(threshold, Zmin), Zmax])
+        # Mask values below threshold
+        Z_highlight = np.where(Z >= threshold, Z, Zmin - 1.0)
+        return ax.contourf(X, Y, Z_highlight, levels=fill_levels, cmap=cmap)
     # -------------------------------------------------------------------
     def _add_shared_colorbar(self, fig, axes, results, norm , colorbar_labels_set=None):
         """
@@ -339,7 +360,7 @@ class ContourPlotter:
             The matplotlib contourf or highlight object.
         """
         if config.highlight:
-            return ContourPlotter.highlight_region(
+            return self._highlight_region(
                 ax, 
                 X, 
                 Y, 
@@ -410,27 +431,6 @@ class ContourPlotter:
         
         colorbar.ax.tick_params(labelsize=self.config.font_colorbar)
         return colorbar
-    # -------------------------------------------------------------------
-
-    def highlight_region(
-        ax, X, Y, Z, percent: float, levels: int = 10, cmap: str = "Blues"
-    ):
-        """Highlight top values in Z"""
-        Zmin, Zmax = np.nanmin(Z), np.nanmax(Z)
-        threshold = np.nanpercentile(Z, percent)
-
-        if np.isscalar(levels):
-            n = max(int(levels), 2)
-            fill_levels = np.linspace(max(threshold, Zmin), Zmax, n)
-        else:
-            levels = np.asarray(levels)
-            fill_levels = levels[levels >= threshold]
-            if fill_levels.size < 2:
-                # Ensure have at least two levels for contourf
-                fill_levels = np.array([max(threshold, Zmin), Zmax])
-        # Mask values below threshold
-        Z_highlight = np.where(Z >= threshold, Z, Zmin - 1.0)
-        return ax.contourf(X, Y, Z_highlight, levels=fill_levels, cmap=cmap)
 
     # -------------------------------------------------------------------
     def plot_single_contour(
