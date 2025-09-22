@@ -2,7 +2,7 @@
 """
 ContourLab CLI for 2D and 3D contour plots.
 
-Enhanced version with better error handling and configuration options.
+Adjusted to use the new class-based plotting structure.
 """
 
 import argparse
@@ -13,8 +13,13 @@ from pathlib import Path
 from typing import List, Optional
 import json
 
-from contourlab.plotting import plot_contour, plot_multiple_contours, stack_contours_in_z
-
+# Correct imports for the new class-based structure
+from contourlab.plotting import (
+    ContourPlotter,
+    MultiContourPlotter,
+    Contour3Dstacker,
+    ContourPlotError,
+)
 
 def load_dataframes(csv_files: List[str], separator: str = ",") -> List[pd.DataFrame]:
     """Load multiple CSV files with error handling."""
@@ -66,7 +71,10 @@ def create_2d_plot(df: pd.DataFrame, args: argparse.Namespace) -> plt.Figure:
     """Create a single 2D contour plot."""
     print("Creating 2D contour plot...")
     
-    res = plot_contour(
+    plotter = ContourPlotter()
+    
+    # Calls the new class method with a single DataFrame
+    res = plotter.plot_single_contour(
         df, 
         x_col=args.x, 
         y_col=args.y, 
@@ -75,17 +83,19 @@ def create_2d_plot(df: pd.DataFrame, args: argparse.Namespace) -> plt.Figure:
         interp=args.interp, 
         add_colorbar=True,
         title=args.title,
-        xlabels=args.xlabel or args.x,
-        ylabels=args.ylabel or args.y,
+        x_label=args.xlabel or args.x,
+        y_label=args.ylabel or args.y,
         cmap=args.colormap
     )
     
-    return res["contour"].axes.figure
+    return res["figure"]
 
 
 def create_multi_plot(dataframes: List[pd.DataFrame], args: argparse.Namespace) -> plt.Figure:
     """Create multiple 2D contour plots."""
     print(f"Creating {len(dataframes)} subplot(s) in {args.ncols} columns...")
+    
+    multi_plotter = MultiContourPlotter()
     
     # Generate titles if not provided
     titles = None
@@ -94,7 +104,7 @@ def create_multi_plot(dataframes: List[pd.DataFrame], args: argparse.Namespace) 
     elif len(dataframes) > 1:
         titles = [f"Dataset {i+1}" for i in range(len(dataframes))]
     
-    res = plot_multiple_contours(
+    res = multi_plotter.plot_multiple_contours(
         dataframes, 
         x_col=args.x, 
         y_col=args.y, 
@@ -103,10 +113,10 @@ def create_multi_plot(dataframes: List[pd.DataFrame], args: argparse.Namespace) 
         ncols=args.ncols, 
         add_colorbar=True,
         titles=titles,
-        share_norm=args.shared_colorscale
+        shared_normalization=args.shared_colorscale
     )
     
-    return res["fig"]
+    return res["figure"]
 
 
 def create_3d_stack(dataframes: List[pd.DataFrame], args: argparse.Namespace) -> plt.Figure:
@@ -114,10 +124,12 @@ def create_3d_stack(dataframes: List[pd.DataFrame], args: argparse.Namespace) ->
     print(f"Creating 3D stack from {len(dataframes)} dataset(s)...")
     
     # Generate contour data for each dataframe
+    plotter = ContourPlotter()
     contour_results = []
+    
     for i, df in enumerate(dataframes):
         print(f"Processing dataset {i+1}/{len(dataframes)}...")
-        res = plot_contour(
+        res = plotter.plot_single_contour(
             df, 
             x_col=args.x, 
             y_col=args.y, 
@@ -125,17 +137,18 @@ def create_3d_stack(dataframes: List[pd.DataFrame], args: argparse.Namespace) ->
             levels=args.levels, 
             interp=args.interp
         )
-        contour_results.append(res["contour"])
+        contour_results.append(res) # Appending the full result dictionary
     
-    # Stack in 3D
-    res = stack_contours_in_z(
+    # Stack in 3D using the Contour3Dstacker class
+    stacker = Contour3Dstacker()
+    res = stacker.stack_contours(
         contour_results,
         mode=args.render_mode,
         elev=args.elevation,
         azim=args.azimuth
     )
     
-    return res["fig"]
+    return res["figure"]
 
 
 def save_or_show(figure: plt.Figure, output_path: Optional[str], dpi: int = 300):
