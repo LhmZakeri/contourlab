@@ -21,10 +21,11 @@ def create_example_datasets(num_datasets=3, num_points=50, noise_level=0.1):
         datasets.append(df)
     return datasets
 
+config = PlotConfig(dpi=200)
 if __name__ == "__main__":
     print("--- Running Multi-Contour Plotting Example ---")
     datasets = create_example_datasets()
-    mcp = MultiContourPlotter()
+    mcp = MultiContourPlotter(config)
     
     mcp.plot_multiple_contours(
         datasets=datasets,
@@ -33,15 +34,19 @@ if __name__ == "__main__":
         z_col="z",
         titles=["Slice 1 (center 0,0)", "Slice 2 (center 2,-2)", "Slice 3 (center -3,3)"],
         shared_normalization=True,  
-        ncols=3,
+        ncols=2,
         cmap="viridis",
         annotate=True,
-        levels=15,
+        #levels=15,
         add_colorbar=True,
-        show=True,
         verbose=False,
         contour_filled=True,
-        adaptive_levels=False,
+        #adaptive_levels=False,
+        font_axis_label=16,
+        font_title= 16, 
+        font_tick=16,
+        savepath='./images/Gaussain_Shared_colorbar_normalization_Automatic_levels_Adaptive.png',
+        show=False,
     )
     
 

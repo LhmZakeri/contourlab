@@ -9,7 +9,7 @@ if __name__ == "__main__":
     plot_config = PlotConfig(
         # --- Figure setting ---
         figsize= (6, 5), 
-        dpi= 100,
+        dpi= 200,
         # --- Font settings ---
         font_axis_label = 12,
         font_tick = 10,
@@ -88,7 +88,7 @@ if __name__ == "__main__":
         ncols = 3,
         interpolate=True, 
 
-        shared_normalization= True,
+        shared_normalization= False,
         robust_normalization = False, # shared_normalization should be True also 
         adaptive_levels = False, 
         level_method = 'quantile', #'Log'/'linear'/'quantile',
@@ -97,9 +97,9 @@ if __name__ == "__main__":
         #levels = 10,
         #levels_step = 1,
 
-        titles=["Sigma (4, 2)", "Sigma (5, 5)", "Sigma (6, 2)", "Sigma (8, 4)", "Sigma (9, 3)"],        
+        titles=["Fig 1", "Fig 2", "Fig 3", "Fig 4", "Fig 5"],        
         #x_labels
-        y_labels=["Mean of Success Rate", None, None, "Mean of Success Rate", None], 
+        y_labels=[None, None, None, None, None], 
 
         annotate=True, 
         highlight = False,
@@ -110,6 +110,11 @@ if __name__ == "__main__":
         add_colorbar=True, 
         show=True,
         verbose = True,  
+        font_tick=14,
+        font_axis_label=14,
+        font_title=14,
+        savepath = './images/Dataframe_customized_levels_subplot.png'
+        
     )
     c3d = Contour3Dstacker(plot_config, verbose=True)
     c3d.stack_contours(
@@ -121,6 +126,10 @@ if __name__ == "__main__":
         shared_norm=results['shared_norm'],
         add_colorbar=True,
         line_colors='k',
+        font_tick=14,
+        font_axis_label=14,
+        font_title=14,
+        savepath='./images/Dataframe_customized_levels_3DStacked.png'
         
     )
 

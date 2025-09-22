@@ -236,6 +236,7 @@ class ContourPlotter:
         x_label: Optional[str],
         y_label: Optional[str],
         title: Optional[str],
+        **kwargs
     ) -> None:
         """
         Configures axis labels, ticks, and the title for a given subplot.
@@ -247,15 +248,18 @@ class ContourPlotter:
             title: The title of the subplot.
         
         """
+        font_axis_label = kwargs.get('font_axis_label', self.config.font_axis_label)
+        font_tick = kwargs.get('font_tick', self.config.font_tick)
+        font_title = kwargs.get('font_title', self.config.font_title)
         if x_label:
-            ax.set_xlabel(x_label, fontsize=self.config.font_axis_label)
+            ax.set_xlabel(x_label, fontsize=font_axis_label)
         if y_label:
-            ax.set_ylabel(y_label, fontsize=self.config.font_axis_label)
+            ax.set_ylabel(y_label, fontsize=font_axis_label)
         if title:
-            ax.set_title(title, fontsize=self.config.font_title)
+            ax.set_title(title, fontsize=font_title)
 
-        ax.tick_params(axis="x", labelsize=self.config.font_tick)
-        ax.tick_params(axis="y", labelsize=self.config.font_tick)
+        ax.tick_params(axis="x", labelsize=font_tick)
+        ax.tick_params(axis="y", labelsize=font_tick)
         
     # -------------------------------------------------------------------
     def _highlight_region(
@@ -278,7 +282,7 @@ class ContourPlotter:
         Z_highlight = np.where(Z >= threshold, Z, Zmin - 1.0)
         return ax.contourf(X, Y, Z_highlight, levels=fill_levels, cmap=cmap)
     # -------------------------------------------------------------------
-    def _add_shared_colorbar(self, fig, axes, results, norm , colorbar_labels_set=None):
+    def _add_shared_colorbar(self, fig, axes, results, norm , colorbar_labels_set=None, **kwargs):
         """
         Adds a single, shared colorbar for a set of subplots. 
 
@@ -316,6 +320,7 @@ class ContourPlotter:
             fraction=0.05,
             pad=0.05
         )
+        font_colorbar = kwargs.get('font_colorbar', self.config.font_colorbar)
         if colorbar_labels_set:
             first_labels_dict = colorbar_labels_set[0]
 
@@ -328,7 +333,7 @@ class ContourPlotter:
             else: 
                 ContourPlotError("Number of levels and level labels are not the same.")
                 
-
+        cbar.ax.tick_params(labelsize=font_colorbar)
         return cbar
     # -------------------------------------------------------------------
     def _create_filled_contours(
@@ -379,6 +384,7 @@ class ContourPlotter:
         ax: plt.Axes,
         contour_lines,
         colorbar_labels,
+        **kwargs
     ) -> None: 
         """
         Add inline labels to contour lines for better readability.
@@ -388,18 +394,19 @@ class ContourPlotter:
             contour_lines: The contour lines object returned by ax.contour()
             colorbar_labels: Optional dictionary of labels for the contour lines.
         """
+        font_annotation = kwargs.get('font_annotation', self.config.font_annotation)
         if colorbar_labels:
             ax.clabel(
                 contour_lines,
                 inline = True,
-                fontsize= self.config.font_annotation, 
+                fontsize= font_annotation, 
                 fmt = lambda v: colorbar_labels.get(v, f"{v:.3f}"),
             )
         else:
             ax.clabel(
                 contour_lines, 
                 inline = True,
-                fontsize=self.config.font_annotation,
+                fontsize=font_annotation,
                 fmt= "%.2f",
             )         
     # -------------------------------------------------------------------
@@ -485,7 +492,7 @@ class ContourPlotter:
         else:
             fig = ax.figure
         
-        self._setup_axes(ax, x_label, y_label, title)
+        self._setup_axes(ax, x_label, y_label, title, **kwargs)
 
         contour_lines = ax.contour(
             X, 

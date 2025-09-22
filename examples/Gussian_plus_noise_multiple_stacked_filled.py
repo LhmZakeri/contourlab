@@ -21,7 +21,7 @@ if __name__ == "__main__":
     df1 = pd.DataFrame({"x": X.ravel(), "y": Y.ravel(), "z": Z1.ravel()})
     df2 = pd.DataFrame({"x": X.ravel(), "y": Y.ravel(), "z": Z2.ravel()})
 
-    config = PlotConfig()
+    config = PlotConfig(dpi=200)
     cp = ContourPlotter(config)
     mcp = MultiContourPlotter(config)
     res_multi = mcp.plot_multiple_contours(
@@ -46,6 +46,7 @@ if __name__ == "__main__":
     add_colorbar=False,
     show=True,
     verbose = False,
+    savepath='./images/Gaussian_subplots_filled.png'
     )
 
 
@@ -62,4 +63,5 @@ if __name__ == "__main__":
     final_levels=res_multi["final_levels"],
     line_colors = 'k',
     verbose=False,
+    savepath='./images/Gaussian_subplots_filled_3dstacked.png'
     )

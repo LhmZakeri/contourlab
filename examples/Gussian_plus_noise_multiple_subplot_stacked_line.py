@@ -32,7 +32,7 @@ if __name__ == "__main__":
     df4 = make_dataframe(X, Y, Z4)
     df5 = make_dataframe(X, Y, Z5)
 
-    config = PlotConfig()
+    config = PlotConfig(dpi=200)
     cp = ContourPlotter(config)
     mcp = MultiContourPlotter(config)
     res_multi = mcp.plot_multiple_contours(
@@ -55,8 +55,10 @@ if __name__ == "__main__":
     percentile_threshold=60,
     contour_filled = False,
     add_colorbar=False,
+    font_tick=16,
     show=True,
     verbose = False,
+    savepath='./images/Gaussian_subplots_line.png'
     )
 
 
@@ -72,6 +74,7 @@ if __name__ == "__main__":
     show_line = True,
     final_levels=res_multi["final_levels"],
     line_colors = 'k',
+    savepath='./images/Gaussian_subplots_line_3dstacked.png',
     verbose=False,
     )
 

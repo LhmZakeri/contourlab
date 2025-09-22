@@ -15,7 +15,7 @@ if __name__ == "__main__":
 
     df = pd.DataFrame({"x": X.ravel(), "y": Y.ravel(), "z": Z.ravel()})
 
-    config = PlotConfig()
+    config = PlotConfig(dpi=200)
     cp = ContourPlotter(config)
     mcp = MultiContourPlotter(config)
     res_multi = mcp.plot_multiple_contours(
@@ -36,6 +36,7 @@ if __name__ == "__main__":
     add_colorbar=True,
     show=True,
     verbose = False,
+    savepath='./images/Gaussian_line_highlight.png'
     )
 
 
