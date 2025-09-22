@@ -259,7 +259,7 @@ class ContourPlotter:
         
     # -------------------------------------------------------------------
     def _highlight_region(
-        ax, X, Y, Z, percent: float, levels: int = 10, cmap: str = "Blues"
+        self, ax, X, Y, Z, percent: float, levels: int = 10, cmap: str = "Blues"
     ):
         """Highlight top values in Z"""
         Zmin, Zmax = np.nanmin(Z), np.nanmax(Z)
