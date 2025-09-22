@@ -20,3 +20,36 @@ ContourLab is an initial attempt at creating a Python library to generate contou
     * **filled mode:** Renders the contours as solid, filled surfaces using `Poly3DCollection`.
 
     The CLI command for this feature is `contourlab --csv slice1.csv slice2.csv slice3.csv --x period --y wavelength --z intensity --mode 3d-stack`. You can also specify the rendering mode with `--render-mode filled` to activate the filled plot option.
+
+* **Command-Line Interface:** A simple CLI to test basic functionalities.
+* **Dependency Management:** Configured with pyproject.toml for standard installation.
+ 
+## **Step-by-Step Guide**
+1.**Clone the repository:**
+	git clone https://github.com/LhmZakeri/contourlab.git
+
+2.**Navigate to the project directory**
+	cd contourlab
+
+3.**Create and activate a virtual environment:**
+	* on Windows:
+		python -m venv venv
+		.\venv\Scripts\activate
+	* on macOS/Linux:
+		python3 -m venv venv
+		source venv/bin/activate
+4.**Install the package in editable mode:** 
+	pip install -e .
+
+## **CLI Examples**
+**1.Basc 2D Plot**
+This command generates a simple 2D contour plot
+contourlab --csv data/crn_table_sigma42.txt --x  period --y wavelength --z simdur
+
+**2.3D Stack**
+This command attempts to visualize several data files in a 3D stack.
+contourlab --csv slice1.csv slice2.csv slice3.csv --x period --y wavelength --z intensity --mode 3d-stack
+
+## **License**
+This project is licenced under the MIT License.
+
